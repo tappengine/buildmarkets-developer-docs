@@ -101,11 +101,15 @@ The list endpoint supports pagination, filtering, and sorting.
 
 Use `PATCH /v1/accounts/{accountId}` to modify mutable fields. Immutable fields like `date_of_birth` and `tax_id` cannot be changed post-creation. **Mutable Fields:** `contact`, `identity` (limited), `disclosures`, `trusted_contact`, `employment`, `investment_profile`, `registered_rep_code`.
 
+<Note>
+  Fields inside `contact` are individually optional on a PATCH, with one exception: if you send a `contact` object at all, it must include a valid `phone_number` (7–25 characters, with country code).
+</Note>
+
 ```bash
 curl -X PATCH https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID \
   -H "X-API-Key: YOUR_API_KEY" -H "X-API-Secret: YOUR_API_SECRET" \
   -H "Content-Type: application/json" \
-  -d '{ "contact": { "email_address": "new@example.com", "city": "Austin", "state": "TX", "postal_code": "78702" } }'
+  -d '{ "contact": { "email_address": "new@example.com", "phone_number": "+15125550100", "city": "Austin", "state": "TX", "postal_code": "78702" } }'
 ```
 
 ## Closing an Account
