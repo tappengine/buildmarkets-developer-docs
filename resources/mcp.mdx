@@ -71,6 +71,8 @@ As an **account** user you never have to pass an account ID — the MCP knows wh
 
 These three values are sent on every request as the headers `X-API-Key`, `X-API-Secret`, and `X-User-Type`.
 
+A `partner` key is issued by TAPP Engine. An `account` token (`tappacct_…`) is one you mint yourself for a single account with `POST /v1/accounts/{accountId}/keys` — see [Account-scoped tokens](/platform/authentication#account-scoped-tokens).
+
 ---
 
 ## Connecting
