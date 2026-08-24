@@ -12,7 +12,7 @@ POST /v1/accounts
 
 ## Required Fields
 
-The minimum required fields to create an account are: `contact` (email, address, city, state, postal code); `identity` (first name, last name, date of birth, SSN/tax ID); `investment_profile` (risk tolerance, investment objective, income and net worth ranges). All other fields are optional but may be required for specific account types or trading features.
+The minimum required fields to create an account are: `contact` (email, phone, address, city, state, postal code); `identity` (first name, last name, date of birth, SSN/tax ID); `investment_profile` (risk tolerance, investment objective, income and net worth ranges). All other fields are optional but may be required for specific account types or trading features.
 
 ## Full Request Schema
 
@@ -21,7 +21,7 @@ The minimum required fields to create an account are: `contact` (email, address,
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `email_address` | string | ✅ | Primary email address |
-| `phone_number` | string |  | Phone with country code (e.g. `+15125550100`) |
+| `phone_number` | string | ✅ | Phone with country code, 7–25 characters (e.g. `+15125550100`) |
 | `street_address` | string\[\] |  | Street address lines |
 | `unit` | string |  | Apartment, suite, or unit number |
 | `city` | string | ✅ | City |
