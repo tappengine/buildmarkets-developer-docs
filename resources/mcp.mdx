@@ -60,13 +60,7 @@ As an **account** user you never have to pass an account ID — the MCP knows wh
 ## What you need
 
 1. **API key + secret** for your role (issued by TAPP Engine).
-2. **The MCP URL** for your environment:
-
-   | Environment | URL |
-   |-------------|-----|
-   | QA | `https://qa-mcp-api.tappengine.com/mcp` |
-   | Dev | `https://dev-mcp-api.tappengine.com/mcp` |
-
+2. **The MCP URL**: `https://dev-mcp-api.tappengine.com/mcp`
 3. Your **role**: `partner` or `account`.
 
 These three values are sent on every request as the headers `X-API-Key`, `X-API-Secret`, and `X-User-Type`.
@@ -79,13 +73,13 @@ These three values are sent on every request as the headers `X-API-Key`, `X-API-
 
 ```bash
 # Account holder (can trade)
-claude mcp add --transport http tapp https://qa-mcp-api.tappengine.com/mcp \
+claude mcp add --transport http tapp https://dev-mcp-api.tappengine.com/mcp \
   --header "X-API-Key: tappacct_…" \
   --header "X-API-Secret: sk_…" \
   --header "X-User-Type: account"
 
 # Partner (market data, admin)
-claude mcp add --transport http tapp https://qa-mcp-api.tappengine.com/mcp \
+claude mcp add --transport http tapp https://dev-mcp-api.tappengine.com/mcp \
   --header "X-API-Key: tapp_…" \
   --header "X-API-Secret: sk_…" \
   --header "X-User-Type: partner"
@@ -98,7 +92,7 @@ claude mcp add --transport http tapp https://qa-mcp-api.tappengine.com/mcp \
   "mcpServers": {
     "tapp": {
       "type": "http",
-      "url": "https://qa-mcp-api.tappengine.com/mcp",
+      "url": "https://dev-mcp-api.tappengine.com/mcp",
       "headers": {
         "X-API-Key": "tappacct_…",
         "X-API-Secret": "sk_…",
@@ -116,7 +110,7 @@ In `~/.codex/config.toml`:
 ```toml
 [mcp_servers.tapp]
 command = "npx"
-args = ["-y", "mcp-remote", "https://qa-mcp-api.tappengine.com/mcp",
+args = ["-y", "mcp-remote", "https://dev-mcp-api.tappengine.com/mcp",
         "--header", "X-API-Key: tappacct_…",
         "--header", "X-API-Secret: sk_…",
         "--header", "X-User-Type: account"]
@@ -127,7 +121,7 @@ args = ["-y", "mcp-remote", "https://qa-mcp-api.tappengine.com/mcp",
 Some connectors only accept a URL. Pass the credentials as URL query parameters instead of headers:
 
 ```
-https://qa-mcp-api.tappengine.com/mcp?api_key=tappacct_…&api_secret=sk_…&user_type=account
+https://dev-mcp-api.tappengine.com/mcp?api_key=tappacct_…&api_secret=sk_…&user_type=account
 ```
 
 After connecting, restart your client if needed, then confirm the tools appear in its tool list. Switch roles by swapping the key and `X-User-Type` (`partner` ⇄ `account`).
