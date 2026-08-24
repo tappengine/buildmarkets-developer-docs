@@ -1,0 +1,177 @@
+{
+  "projectType": "api-service",
+  "projectName": "Buildmarkets",
+  "projectDescription": "A white-label brokerage and wealth management infrastructure API that lets fintech companies and financial institutions embed accounts, KYC, equity trading, ACH funding, market data, and documents into their products through a single REST API.",
+  "theme": "luma",
+  "primaryColor": "#3E5FFE",
+  "lightColor": "#8D98FF",
+  "darkColor": "#3549A3",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Get Started",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "get-started/welcome",
+              "get-started/quick-start-self-directed",
+              "get-started/quick-start-wealth",
+              "get-started/sandbox",
+              "get-started/go-live"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Platform",
+        "groups": [
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "platform/overview",
+              "platform/authentication",
+              "platform/accounts",
+              "platform/compliance-kyc",
+              "platform/wallets",
+              "platform/funding",
+              "platform/trading",
+              "platform/assets",
+              "platform/positions"
+            ]
+          },
+          {
+            "group": "Infrastructure",
+            "pages": [
+              "platform/webhooks",
+              "platform/errors",
+              "platform/idempotency"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Self-Directed Investing",
+            "pages": [
+              "guides/overview",
+              "guides/self-directed/account-onboarding",
+              "guides/self-directed/kyc-verification",
+              "guides/self-directed/bank-linking",
+              "guides/self-directed/deposits-withdrawals",
+              "guides/self-directed/placing-orders",
+              "guides/self-directed/positions-portfolio"
+            ]
+          },
+          {
+            "group": "Platform Operations",
+            "pages": [
+              "guides/operations/webhook-setup",
+              "guides/operations/market-data",
+              "guides/operations/testing-and-sandbox"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "FIX Gateway",
+        "groups": [
+          {
+            "group": "FIX Gateway",
+            "pages": [
+              "fix-gateway/fix-gateway-overview",
+              "fix-gateway/session-protocol",
+              "fix-gateway/new-order-single-d",
+              "fix-gateway/new-order-multileg-ab",
+              "fix-gateway/order-cancel-request-f",
+              "fix-gateway/order-status-request-h",
+              "fix-gateway/execution-report-8",
+              "fix-gateway/order-cancel-reject-9",
+              "fix-gateway/business-message-reject-j",
+              "fix-gateway/dollar-amount-fractional-orders"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Documents",
+        "groups": [
+          {
+            "group": "Documents",
+            "pages": [
+              "documents/documents-overview",
+              "documents/retrieving-documents",
+              "documents/emailing-documents"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-reference/introduction"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Developer Tools",
+            "pages": [
+              "resources/postman",
+              "resources/ai-tools"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "resources/error-codes",
+              "resources/glossary",
+              "resources/support"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Self-directed investing: brokerage accounts, KYC verification, equity & ETF order execution, fractional shares",
+    "Wealth management: advisor-managed accounts, robo-advisory, automated portfolio rebalancing",
+    "ACH funding via Plaid Link integration — deposits and withdrawals",
+    "Real-time and historical market data: quotes, OHLCV bars, fundamentals, news, company profiles",
+    "Webhook event notifications for orders, transfers, accounts, and KYC status changes",
+    "FIX 4.4 gateway for institutional-grade, low-latency order management",
+    "Document management: statements, tax forms, compliance documents — retrieve and email",
+    "Sandbox environment with simulated trading, instant fills, and KYC outcome control via SSN suffix",
+    "Idempotency support for all financial write operations",
+    "API key scopes and partner dashboard for credential management"
+  ],
+  "publicApiSurface": [
+    "POST /v1/investors — Create investor (brokerage account)",
+    "GET /v1/investors/{investor_id} — Retrieve investor details",
+    "POST /v1/investors/{investor_id}/compliance/submit — Submit KYC",
+    "POST /v1/investors/{investor_id}/funding-sources/plaid/link-token — Get Plaid Link token",
+    "POST /v1/investors/{investor_id}/funding-sources/connect — Connect bank via Plaid",
+    "POST /v1/investors/{investor_id}/deposits — Initiate deposit",
+    "POST /v1/investors/{investor_id}/withdrawals — Initiate withdrawal",
+    "POST /v1/investors/{investor_id}/orders — Place order",
+    "DELETE /v1/investors/{investor_id}/orders/{order_id}/cancel — Cancel order",
+    "GET /v1/investors/{investor_id}/positions — List positions",
+    "GET /v1/investors/{investor_id}/wallets — Get wallet balances",
+    "GET /v1/assets/search — Search tradable assets",
+    "GET /v1/assets/{symbol} — Get asset details",
+    "GET /v1/documents — List documents",
+    "GET /v1/documents/{document_id}/download — Download document",
+    "POST /v1/webhooks — Register webhook",
+    "GET /v1/webhooks/event-types — List webhook event types",
+    "GET /v1/markets/{code}/status — Get market status",
+    "GET /v1/markets/{code}/calendar — Get market calendar"
+  ]
+}

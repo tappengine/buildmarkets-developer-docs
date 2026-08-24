@@ -1,0 +1,87 @@
+---
+title: "Buildmarkets Support: Contact, Status, and Resources"
+sidebarTitle: "Support"
+description: "Get help with your Buildmarkets integration via email support, check the system status page, and find links to key developer resources."
+---
+
+Buildmarkets provides several channels depending on the nature and urgency of your question. For integration questions, developer email support is the fastest path to an answer. For active incidents, the status page is the first place to check before reaching out.
+
+## Support channels
+
+<CardGroup cols={2}>
+  <Card title="Developer Support" icon="envelope" href="mailto:support@buildmarkets.ai">
+    Email [support@buildmarkets.ai](mailto:support@buildmarkets.ai) for integration help, technical questions, API issues, scope changes, SDK inquiries, and production access requests.
+  </Card>
+
+<Card
+  title='System Status'
+  icon='signal'
+  href='https://tappengine.statuspage.io/'
+>
+  Check [tappengine.statuspage.io](https://tappengine.statuspage.io/) for live
+  incident reports, component health, and scheduled maintenance windows.
+</Card>
+</CardGroup>
+
+## When to use each channel
+
+| Situation                                             | Best channel                |
+| ----------------------------------------------------- | --------------------------- |
+| Integration question, API issue, or production access | Developer Support           |
+| Active incident or unexpected downtime                | System Status (check first) |
+| API credential management                             | Email Developer Support     |
+| Sample code or open-source tooling                    | GitHub (github.com/tappengine) |
+
+## What to include when contacting support
+
+Including the right information upfront helps the team diagnose and resolve your issue without back-and-forth. When you email Developer Support, provide:
+
+- **Your company name** and Partner Dashboard account email
+- **Environment** — sandbox or production
+- **The `request_id`** from the API error response (included in every error body)
+- **The error `code`** — for example, `VALIDATION_ERROR`
+- **Timestamp** of when the issue occurred (UTC)
+- **Steps to reproduce** — the endpoint you called, the request body or parameters, and the full error response
+
+<Tip>
+  The `request_id` is the single most useful piece of information for diagnosing
+  an API issue. Every error response includes it — log it alongside your
+  outbound requests so you always have it on hand.
+</Tip>
+
+## Self-service resources
+
+Most integration questions have documented answers. Check these resources before reaching out:
+
+<CardGroup cols={2}>
+  <Card title="Error Codes" icon="triangle-exclamation" href="/resources/error-codes">
+    Full catalog of error codes with causes and resolution steps.
+  </Card>
+
+  <Card title='Postman Collection' icon='paper-plane' href='https://documenter.getpostman.com/view/56251887/2sBXwyHSib'>
+    124 pre-built requests organized by endpoint group — ready to run against the
+    sandbox.
+  </Card>
+
+  <Card title="AI Tools" icon="robot" href="/resources/ai-tools">
+    Use llms.txt, llms-full.txt, and the OpenAPI spec to get accurate AI-assisted integration help.
+  </Card>
+
+  <Card title="API Reference" icon="book" href="/api-reference/introduction">
+    Complete endpoint documentation with request schemas, response shapes, and examples.
+  </Card>
+</CardGroup>
+
+## Requesting production access
+
+When your sandbox testing is complete, email Developer Support with the following:
+
+1. Your company name and Partner Dashboard account email
+2. Your integration model — Self-Directed or Wealth Management
+3. Confirmation that end-to-end sandbox testing is complete
+
+<Note>
+  Review the Going Live guide for the full production readiness checklist —
+  including webhook verification, error handling, and rate limit strategy —
+  before you request production credentials.
+</Note>

@@ -1,0 +1,272 @@
+---
+title: "Webhooks"
+sidebarTitle: "Webhooks"
+description: "Register and manage HTTPS webhook endpoints to receive real-time event notifications from Buildmarkets instead of polling the API."
+---
+
+Webhooks let your application receive real-time notifications when events occur within Buildmarkets — account approvals, funding transfers, order fills, and more. Rather than polling the API repeatedly to check for status changes, you register an HTTPS endpoint and Buildmarkets pushes event payloads to it as things happen.
+
+This page covers how to register and manage webhook endpoints. For a full reference of every event type and its payload structure, see [Webhook Events Reference](/guides/operations/webhook-setup). For payload verification, retry logic, and delivery guarantees, see [Webhook Security & Delivery](/guides/operations/webhook-setup).
+
+---
+
+## How webhooks work
+
+```text
+      Event occurs in Buildmarkets         Buildmarkets sends HTTP POST          Your server
+      (e.g., order filled)   →     to your webhook URL      →    processes event
+                                   with signed payload            and returns 2xx
+```
+
+1. **Register** an HTTPS endpoint via `POST /v1/webhooks`
+2. **Receive** a signing secret — used to verify that payloads come from Buildmarkets
+3. **Buildmarkets delivers** a JSON payload to your URL via HTTP POST whenever a subscribed event fires
+4. **Your server** validates the signature, processes the event, and returns a `2xx` status
+5. **Buildmarkets retries** failed deliveries automatically (see [Security & Delivery](/guides/operations/webhook-setup))
+
+> **The secret is shown only once.** Store it securely at registration time — it cannot be retrieved again. If lost, delete the webhook and create a new one.
+
+---
+
+## Endpoints
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/v1/webhooks` | Register a new webhook endpoint |
+| `GET` | `/v1/webhooks` | List all registered webhooks |
+| `GET` | `/v1/webhooks/{webhookId}` | Get details for a specific webhook |
+| `PATCH` | `/v1/webhooks/{webhookId}` | Update URL, events, or status |
+| `DELETE` | `/v1/webhooks/{webhookId}` | Permanently remove a webhook |
+| `POST` | `/v1/webhooks/{webhookId}/test` | Send a test event to verify connectivity |
+| `GET` | `/v1/webhooks/{webhookId}/deliveries` | View delivery attempt history |
+
+---
+
+## Create a webhook
+
+Registers a new HTTPS endpoint to receive events. Pass an empty `events` array to subscribe to **all** event types. Pass specific event names to subscribe to a subset.
+
+### `POST /v1/webhooks`
+
+#### Request body
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `url` | string (URI) | ✅ | HTTPS URL where Buildmarkets will POST event payloads. Must be a valid `https://` URL |
+| `events` | array of strings | ✅ | Event types to subscribe to. Pass an empty array `[]` to receive all events. See [Webhook Events Reference](/guides/operations/webhook-setup) for valid values |
+
+#### Response body (`201 Created`)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string (UUID) | Unique identifier for this webhook |
+| `url` | string | The registered HTTPS endpoint |
+| `events` | array of strings | Subscribed event types (empty = all) |
+| `status` | string | Webhook status: `active` or `disabled` |
+| `secret` | string | **Shown only once.** HMAC signing secret — store this securely immediately |
+| `created_at` | string (ISO 8601) | Registration timestamp |
+
+> ⚠️ **Store the `secret` now.** It is returned exactly once in the `201` response and cannot be retrieved again. If lost, the webhook must be deleted and recreated.
+
+#### Example request — subscribe to all events
+
+```bash
+curl -X POST https://api.tappengine.com/v1/webhooks \
+  -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://myapp.com/webhooks/buildmarkets",
+    "events": []
+  }'
+```
+
+#### Example request — subscribe to specific events
+
+```bash
+curl -X POST https://api.tappengine.com/v1/webhooks \
+  -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://myapp.com/webhooks/buildmarkets",
+    "events": [
+      "account.kyc_approved",
+      "account.closed",
+      "funding.deposit_completed",
+      "order.filled",
+      "order.cancelled"
+    ]
+  }'
+```
+
+#### Example response
+
+```json
+{
+  "id": "wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+  "url": "https://myapp.com/webhooks/buildmarkets",
+  "events": [
+    "account.kyc_approved",
+    "account.closed",
+    "funding.deposit_completed",
+    "order.filled",
+    "order.cancelled"
+  ],
+  "status": "active",
+  "secret": "whsec_xK9mP2qR7tNvL4jW8cB5yZ3hF6dE1sA0",
+  "created_at": "2026-03-24T10:00:00Z"
+}
+```
+
+---
+
+## List webhooks
+
+Returns all registered webhook endpoints for your account.
+
+### `GET /v1/webhooks`
+
+#### Example request
+
+```bash
+curl https://api.tappengine.com/v1/webhooks \
+  -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET"
+```
+
+#### Example response
+
+```json
+[
+  {
+    "id": "wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+    "url": "https://myapp.com/webhooks/buildmarkets",
+    "events": ["account.kyc_approved", "order.filled"],
+    "status": "active",
+    "created_at": "2026-03-24T10:00:00Z"
+  }
+]
+```
+
+> **Note:** The `secret` field is **not** included in list or get responses — only in the initial `201` creation response.
+
+---
+
+## Get a webhook
+
+Returns the configuration for a single registered webhook by ID. The signing `secret` is not returned.
+
+### `GET /v1/webhooks/{webhookId}`
+
+#### Path parameters
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `webhookId` | string (UUID) | ✅ | The webhook ID |
+
+#### Example request
+
+```bash
+curl https://api.tappengine.com/v1/webhooks/wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
+  -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET"
+```
+
+---
+
+## Update a webhook
+
+Updates the URL, subscribed events, or status of an existing webhook. Only include fields you want to change.
+
+### `PATCH /v1/webhooks/{webhookId}`
+
+#### Path parameters
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `webhookId` | string (UUID) | ✅ | The webhook ID to update |
+
+#### Request body (all fields optional)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `url` | string | New HTTPS URL to deliver events to |
+| `events` | array of strings | Updated list of subscribed event types |
+| `status` | string | `active` to enable delivery, `disabled` to pause it |
+
+#### Example request — disable a webhook temporarily
+
+```bash
+curl -X PATCH https://api.tappengine.com/v1/webhooks/wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
+  -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "disabled"}'
+```
+
+#### Example request — update URL and event subscriptions
+
+```bash
+curl -X PATCH https://api.tappengine.com/v1/webhooks/wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
+  -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://myapp.com/webhooks/buildmarkets-v2",
+    "events": ["account.kyc_approved", "order.filled", "order.rejected", "funding.deposit_completed"]
+  }'
+```
+
+---
+
+## Send a test event
+
+Triggers a synthetic test payload to be sent to the webhook's registered URL. Use this to verify that your endpoint is reachable and correctly processing Buildmarkets payloads without waiting for a real event to occur.
+
+### `POST /v1/webhooks/{webhookId}/test`
+
+#### Path parameters
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `webhookId` | string (UUID) | ✅ | The webhook ID to test |
+
+#### Example request
+
+```bash
+curl -X POST https://api.tappengine.com/v1/webhooks/wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6/test \
+  -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET"
+```
+
+Buildmarkets sends a test payload with `"event_type": "webhook.test"` to the registered URL. Your endpoint should respond with a `2xx` status. Check the [delivery history](/guides/operations/webhook-setup) to see whether it was received successfully.
+
+---
+
+## Delete a webhook
+
+Permanently removes the webhook. Delivery to the registered URL stops immediately. This action cannot be undone.
+
+### `DELETE /v1/webhooks/{webhookId}`
+
+Returns `204 No Content` on success.
+
+#### Example request
+
+```bash
+curl -X DELETE https://api.tappengine.com/v1/webhooks/wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
+  -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET"
+```
+
+---
+
+## Common errors
+
+| HTTP Status | Error | Cause |
+| --- | --- | --- |
+| `400` | `INVALID_URL` | Webhook URL is not a valid `https://` URI |
+| `400` | `INVALID_EVENT` | One or more event names in the `events` array are not recognized |
+| `404` | `WEBHOOK_NOT_FOUND` | No webhook found for the provided `webhookId` |
+
+---
+
+## Next steps
+
+- [Webhook Events Reference →](/guides/operations/webhook-setup) — Full list of event types and their payload schemas
+- [Webhook Security & Delivery →](/guides/operations/webhook-setup) — Signature verification, retry logic, and delivery history
+
+Updated 3 months ago

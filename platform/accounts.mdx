@@ -1,0 +1,122 @@
+---
+title: "Accounts"
+sidebarTitle: "Accounts"
+description: "The Accounts API is the core of Buildmarkets, covering account types, endpoints, statuses, KYC, listing, updating, and closing accounts."
+---
+
+## Introduction
+
+The Accounts API serves as the core foundation of Buildmarkets. Every end-user brokerage account is represented as an account resource, with all trading, funding, and document activity organized beneath it.
+
+## What is an Account?
+
+A Buildmarkets account is "a fully-managed brokerage account for one of your end users." When creating an account, you submit identity, contact, suitability, and disclosure information on the user's behalf. The system then handles KYC/AML verification, agreement tracking, account status management, and real-time position and balance custody.
+
+## Account Types
+
+- **individual** — Standard individual brokerage account (default)
+- **joint** — Joint account requiring a `joint_owner` object in the creation request
+- **ira\_traditional** — Traditional IRA retirement account
+- **ira\_roth** — Roth IRA retirement account
+- **custodial** — Custodial account opened on behalf of a minor
+
+## Account Endpoints
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| POST | `/v1/accounts` | Create new brokerage account |
+| POST | `/v1/users/{userId}/accounts` | Open an additional account for an existing, KYC-approved user |
+| GET | `/v1/accounts` | List all accounts (paginated, filterable) |
+| GET | `/v1/accounts/{accountId}` | Get full account details |
+| PATCH | `/v1/accounts/{accountId}` | Update contact, identity, or profile fields |
+| POST | `/v1/accounts/{accountId}/actions/close` | Initiate account closure |
+| GET | `/v1/accounts/{accountId}/balances` | Get cash and equity balances |
+| GET | `/v1/accounts/{accountId}/positions` | List all open positions |
+| GET | `/v1/accounts/{accountId}/positions/{symbol}` | Get specific position by symbol |
+
+## Multiple Accounts per User
+
+Each account belongs to a **user** — the verified person behind it. The first `POST /v1/accounts` call creates both the user profile and their first account; the account response includes a `user_id` field referencing that user.
+
+Once any of a user's accounts passes KYC, the user is considered KYC-approved and can open additional accounts without repeating document verification:
+
+- Call `POST /v1/users/{userId}/accounts` with only the `account_type` (e.g., a second `individual` account, or an `ira_roth` alongside an existing `individual`).
+- Identity fields are locked to the stored, verified user profile — sending an `identity` object is rejected.
+- Optional sections (`contact`, `disclosures`, `agreements`, `investment_profile`, etc.) may be provided to override the stored values; anything omitted falls back to the user's profile.
+- Document verification is skipped — the existing KYC approval carries over, and the account is booked on the clearing system directly.
+
+If the user's KYC is not yet approved, the request fails with `409 USER_KYC_NOT_APPROVED`.
+
+## Account Statuses
+
+| Status | Meaning |
+| --- | --- |
+| SUBMITTED | Account created and submitted for KYC review |
+| ACTION\_REQUIRED | Additional information needed (KYC in manual review, or account restricted) |
+| APPROVAL\_PENDING | KYC approved; account being activated on the clearing system |
+| ACTIVE | Account fully open for trading and funding |
+| ACCOUNT\_CLOSED | Account closed; no further activity permitted |
+
+### KYC Statuses
+
+The `kyc_status` field provides granular visibility into identity verification:
+
+| Status | Meaning |
+| --- | --- |
+| `submitted` | Identity data awaiting processing |
+| `approved` | Identity verified |
+| `rejected` | Identity could not be verified |
+| `action_required` | Requires additional action — either customer resubmission or compliance review; check `kyc_results` for the reason |
+
+The account response also includes a `kyc_results` object with the verification outcome: `summary` (`pass`, `fail`, or `indeterminate`), `reject` (a list of rejection reason labels), and `additional_information`. It is `null` while the review is still in progress.
+
+## Listing Accounts
+
+The list endpoint supports pagination, filtering, and sorting.
+
+**Query Parameters:** `query` (search by name or account number), `status` (filter by account status), `created_after` / `created_before` (ISO 8601), `sort` (e.g., `created_at:desc`), `cursor` (pagination cursor), `limit` (default 25, max 100).
+
+**Example Response:**
+
+```json
+{
+  "data": [
+    {
+      "id": "b3f2c9a1-4d5e-4a2f-8b3c-1e2d3f4a5b6c",
+      "account_number": "ACC123456789",
+      "status": "ACTIVE",
+      "kyc_status": "approved",
+      "currency": "USD",
+      "last_equity": "12450.75",
+      "created_at": "2025-06-01T12:00:00Z",
+      "account_type": "individual",
+      "enabled_assets": ["equity"]
+    }
+  ],
+  "pagination": { "next_cursor": "eyJpZCI6ImIzZjJjOWExIn0=", "has_more": true }
+}
+```
+
+## Updating an Account
+
+Use `PATCH /v1/accounts/{accountId}` to modify mutable fields. Immutable fields like `date_of_birth` and `tax_id` cannot be changed post-creation. **Mutable Fields:** `contact`, `identity` (limited), `disclosures`, `trusted_contact`, `employment`, `investment_profile`, `registered_rep_code`.
+
+```bash
+curl -X PATCH https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID \
+  -H "X-API-Key: YOUR_API_KEY" -H "X-API-Secret: YOUR_API_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{ "contact": { "email_address": "new@example.com", "city": "Austin", "state": "TX", "postal_code": "78702" } }'
+```
+
+## Closing an Account
+
+Accounts must have zero balances (all positions liquidated and funds withdrawn) before closure. The POST action endpoint transitions the account status to `ACCOUNT_CLOSED` and returns `204 No Content` on success.
+
+```bash
+curl -X POST https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID/actions/close \
+  -H "X-API-Key: YOUR_API_KEY" -H "X-API-Secret: YOUR_API_SECRET"
+```
+
+## Next Steps
+
+Related documentation includes Account Opening, Balances & Positions, and Funding Overview guides.

@@ -1,0 +1,199 @@
+---
+title: "TAPP Engine Brokerage MCP"
+sidebarTitle: "MCP"
+description: "Connect your AI assistant (Claude, ChatGPT, Cursor, and other MCP clients) to the TAPP Engine brokerage platform."
+---
+
+Connect your AI assistant (Claude, ChatGPT, Cursor, and other MCP clients) to the TAPP Engine brokerage platform. Once connected, you can ask your assistant to pull market data, check accounts and balances, place and manage trades, move funds, and more.
+
+This guide covers **what the MCP can do** and **how to connect and use it**.
+
+---
+
+## What you can do
+
+The available tools depend on your role (see [Roles](#roles)).
+
+**Market data** (everyone)
+- Real-time quotes, historical prices, company profiles, balance sheets, dividends.
+- Reference data: symbol lookup/search, sectors, industries, symbols by sector.
+- Market news and corporate actions, stock logos.
+
+**Accounts** (account holders)
+- View account details, status, and KYC.
+- Check balances and buying power.
+- View open positions (all, or by symbol).
+
+**Trading** (account holders)
+- Place equity/ETF orders (market or limit).
+- Modify or cancel open orders.
+- List orders, view a single order, and see executions/fills.
+
+**Funding** (account holders)
+- View linked bank (ACH) relationships and funding activity.
+- Initiate deposits and withdrawals.
+
+**Documents** (partners)
+- List supported document types, retrieve statements/confirmations/tax docs, email documents, request a W-9.
+
+**Webhooks** (partners)
+- Create, list, update, test, and delete webhook endpoints; view delivery history.
+
+**Mandates** (account holders) — see [Trading with mandates](#trading-with-mandates)
+- Register, list, and revoke the permissions that authorize automated trading.
+
+---
+
+## Roles
+
+When you connect, you choose one of two roles. They expose **different** sets of tools.
+
+| Role | Use it when you are… | You get | Credentials start with |
+|------|----------------------|---------|------------------------|
+| **partner** | A platform/partner integrator | Market data, account administration, documents, webhooks, API keys. *Cannot trade.* | `tapp_…` |
+| **account** | An individual account holder | Your account's balances, positions, **trading**, funding, and mandates. Locked to your one account. | `tappacct_…` |
+
+As an **account** user you never have to pass an account ID — the MCP knows which account your credentials belong to and fills it in automatically. (If you do pass one and it isn't yours, the request is refused.)
+
+---
+
+## What you need
+
+1. **API key + secret** for your role (issued by TAPP Engine).
+2. **The MCP URL** for your environment:
+
+   | Environment | URL |
+   |-------------|-----|
+   | QA | `https://qa-mcp-api.tappengine.com/mcp` |
+   | Dev | `https://dev-mcp-api.tappengine.com/mcp` |
+
+3. Your **role**: `partner` or `account`.
+
+These three values are sent on every request as the headers `X-API-Key`, `X-API-Secret`, and `X-User-Type`.
+
+---
+
+## Connecting
+
+### Claude Code
+
+```bash
+# Account holder (can trade)
+claude mcp add --transport http tapp https://qa-mcp-api.tappengine.com/mcp \
+  --header "X-API-Key: tappacct_…" \
+  --header "X-API-Secret: sk_…" \
+  --header "X-User-Type: account"
+
+# Partner (market data, admin)
+claude mcp add --transport http tapp https://qa-mcp-api.tappengine.com/mcp \
+  --header "X-API-Key: tapp_…" \
+  --header "X-API-Secret: sk_…" \
+  --header "X-User-Type: partner"
+```
+
+### Claude Desktop / Cursor / VS Code (HTTP config)
+
+```json
+{
+  "mcpServers": {
+    "tapp": {
+      "type": "http",
+      "url": "https://qa-mcp-api.tappengine.com/mcp",
+      "headers": {
+        "X-API-Key": "tappacct_…",
+        "X-API-Secret": "sk_…",
+        "X-User-Type": "account"
+      }
+    }
+  }
+}
+```
+
+### Codex CLI
+
+In `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.tapp]
+command = "npx"
+args = ["-y", "mcp-remote", "https://qa-mcp-api.tappengine.com/mcp",
+        "--header", "X-API-Key: tappacct_…",
+        "--header", "X-API-Secret: sk_…",
+        "--header", "X-User-Type: account"]
+```
+
+### ChatGPT and connectors that can't set headers
+
+Some connectors only accept a URL. Pass the credentials as URL query parameters instead of headers:
+
+```
+https://qa-mcp-api.tappengine.com/mcp?api_key=tappacct_…&api_secret=sk_…&user_type=account
+```
+
+After connecting, restart your client if needed, then confirm the tools appear in its tool list. Switch roles by swapping the key and `X-User-Type` (`partner` ⇄ `account`).
+
+---
+
+## Using it
+
+Once connected, just ask your assistant. Examples:
+
+- “What's the real-time price of AAPL?”
+- “Show MSFT's last 6 months of prices and its latest dividend.”
+- “What's my account balance and buying power?”
+- “List my open positions.”
+- “Buy 1 share of MSFT at market.”
+- “Cancel my open order on TSLA.”
+- “Show my recent deposits and withdrawals.”
+
+Your assistant picks the right tool and fills in the details. As an account user, balances/positions/orders automatically apply to your account.
+
+---
+
+## Trading with mandates
+
+To protect you, automated trading can require a **mandate** — a permission slip you register up front that says exactly what an assistant is allowed to do, with hard limits. When mandates are enforced, a trade only goes through if it matches an active mandate **and** stays within its limits.
+
+**1. Register a mandate** (once):
+
+> “Register a mandate to buy up to 1 share of MSFT per day, max $500 per order.”
+
+A mandate is defined by an **action key** in the form `strategy:security:constraints`, e.g. `dca:MSFT:qty=1:cadence=daily`, plus optional bounds such as:
+
+- `notional_cap` — max dollars per order.
+- `max_position` — max position size.
+- `instrument_whitelist` — allowed symbols.
+- `velocity_cap` — max trades per minute/hour/day/week.
+- `expiry` — when the mandate stops being valid.
+
+**2. Trade.** Matching orders are authorized automatically against the mandate and your **live** balance.
+
+**3. Revoke anytime** — “Revoke my MSFT mandate.” Takes effect immediately.
+
+If a trade is refused, you'll get a clear reason:
+
+| Reason | Meaning |
+|--------|---------|
+| `not_permitted` | No active mandate covers this action. |
+| `out_of_mandate` | The order doesn't match the mandate (wrong symbol or size). |
+| `bounds_exceeded` | The order breaks a limit (cap, whitelist, position, velocity, expiry). |
+
+You can list your mandates anytime (“Show my mandates”).
+
+---
+
+## Troubleshooting
+
+| Message | What it means / fix |
+|---------|---------------------|
+| `X-API-Key and X-API-Secret are required` | Credentials aren't reaching the server — check your headers/query params. |
+| `X-User-Type must be one of ['account','partner']` | Set your role to exactly `partner` or `account`. |
+| `partners cannot use account-scoped tool …` | You're on a partner key but tried an account/trading action — connect as `account`. |
+| `account_id … is not permitted; this credential is locked to account …` | Don't pass another account's ID; let the MCP fill in yours. |
+| A trade is refused with a `reason` | See [Trading with mandates](#trading-with-mandates). |
+| You don't see trading/account tools | You're connected as `partner`; reconnect as `account`. |
+| You don't see options/crypto/wallet tools | Those domains aren't generally available yet. |
+
+---
+
+Need credentials or access? Contact your TAPP Engine representative.

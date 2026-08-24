@@ -1,0 +1,38 @@
+---
+title: "Funding & Transfers"
+sidebarTitle: "Funding"
+description: "Link external bank accounts via ACH, initiate deposits and withdrawals, and track funding activity, statuses, and settlement timing."
+---
+
+## Overview
+
+The Money Movement APIs enable users to "link external bank accounts to a brokerage account, initiate deposits and withdrawals via ACH, and retrieve the full funding activity history."
+
+## Key Process Flow
+
+The funding workflow involves four main steps:
+
+1. Creating an ACH relationship to connect a bank account
+2. Initiating deposits to move money into the brokerage account
+3. Waiting for cash settlement to establish buying power
+4. Placing trades and initiating withdrawals as needed
+
+## Core Endpoints
+
+Seven primary API endpoints manage funding operations:
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| POST | `/v1/accounts/{accountId}/ach-relationships` | Link bank accounts |
+| GET | `/v1/accounts/{accountId}/ach-relationships` | View linked accounts |
+| DELETE | `/v1/accounts/{accountId}/ach-relationships/{achId}` | Remove bank links |
+| POST | `/v1/accounts/{accountId}/funding/deposits` | Start ACH deposits |
+| POST | `/v1/accounts/{accountId}/funding/withdrawals` | Start ACH withdrawals |
+| GET | `/v1/accounts/{accountId}/funding/activity` | View all transactions |
+| GET | `/v1/accounts/{accountId}/funding/activity/{activityId}` | View single transaction |
+
+## Settlement & Status Information
+
+ACH relationships progress through statuses: `pending`, `approved`, `rejected`, and `cancelled`. Funding activities track transfer progress with statuses: `pending`, `sent`, `completed`, `cancelled`, `returned`, and `failed`.
+
+Production ACH transfers typically complete within "1–3 business days," while sandbox environments process instantly.

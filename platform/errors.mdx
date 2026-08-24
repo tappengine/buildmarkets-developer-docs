@@ -1,0 +1,161 @@
+---
+title: "Error Handling"
+sidebarTitle: "Error Handling"
+description: "Reference for Buildmarkets HTTP status codes, structured JSON error bodies, common error codes, rate limits, and retry strategies."
+---
+
+Buildmarkets uses standard HTTP status codes along with structured JSON error bodies to communicate what went wrong. This page is your reference for understanding and handling error responses.
+
+## Error response format
+
+All error responses return a JSON body with a consistent structure:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed",
+    "details": [
+      { "field": "identity.tax_id", "reason": "USA_SSN must be 9 digits." }
+    ],
+    "request_id": "req_abc123xyz"
+  }
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `code` | A machine-readable error code string |
+| `message` | A human-readable description of the error |
+| `details` | (When applicable) Array of `{ field, reason }` objects describing each failed field |
+| `request_id` | A unique ID for this request — include this when contacting Buildmarkets support |
+
+## HTTP status codes
+
+### 2xx — Success
+
+| Code | Meaning |
+| --- | --- |
+| `200 OK` | Request succeeded. Response body contains the resource. |
+| `201 Created` | Resource was created. Response body contains the new resource. |
+| `204 No Content` | Request succeeded. No response body (e.g., DELETE, close account). |
+
+### 4xx — Client errors
+
+| Code | Meaning | Common causes |
+| --- | --- | --- |
+| `400 Bad Request` | The request body or parameters are invalid. | Missing required fields, invalid enum values, malformed JSON |
+| `401 Unauthorized` | Authentication failed. | Missing, invalid, or revoked `X-API-Key` / `X-API-Secret` |
+| `403 Forbidden` | Authenticated, but not authorized. | API key lacks the required scope for this endpoint |
+| `404 Not Found` | The requested resource doesn't exist. | Invalid `accountId`, `orderId`, etc. |
+| `409 Conflict` | Request conflicts with the current state of the resource. | Duplicate `client_order_id`, account already closed |
+| `422 Unprocessable Entity` | Request is syntactically valid but fails business-rule validation. | KYC rejection, insufficient balance for withdrawal |
+| `429 Too Many Requests` | Rate limit exceeded. | See Rate Limits below |
+
+### 5xx — Server errors
+
+| Code | Meaning |
+| --- | --- |
+| `500 Internal Server Error` | An unexpected error occurred on Buildmarkets's side. |
+| `503 Service Unavailable` | The service or a dependency is temporarily unavailable. |
+
+## Common error codes
+
+### Authentication & authorization
+
+| Error code | HTTP | Description |
+| --- | --- | --- |
+| `UNAUTHORIZED` | 401 | API key or secret is missing or invalid |
+| `FORBIDDEN` | 403 | API key is valid but lacks the required scope |
+| `KEY_REVOKED` | 401 | The API key has been revoked |
+
+### Validation errors
+
+| Error code | HTTP | Description |
+| --- | --- | --- |
+| `VALIDATION_ERROR` | 400 | One or more fields failed validation. Check the `details` array. |
+| `MISSING_REQUIRED_FIELD` | 400 | A required field was omitted from the request |
+| `INVALID_ENUM_VALUE` | 400 | A field value is not in the allowed set |
+| `INVALID_FORMAT` | 400 | A field value has an incorrect format (e.g., date, phone number) |
+
+### Account errors
+
+| Error code | HTTP | Description |
+| --- | --- | --- |
+| `ACCOUNT_NOT_FOUND` | 404 | No account exists with the given `accountId` |
+| `ACCOUNT_NOT_ACTIVE` | 422 | The account is not in ACTIVE status and cannot perform this action |
+| `ACCOUNT_ALREADY_CLOSED` | 409 | The account has already been closed |
+| `KYC_REJECTED` | 422 | Account was rejected during KYC verification |
+| `KYC_PENDING` | 422 | Account KYC has not yet completed — certain actions require APPROVED status |
+
+### Trading errors
+
+| Error code | HTTP | Description |
+| --- | --- | --- |
+| `ORDER_NOT_FOUND` | 404 | No order exists with the given `orderId` |
+| `INSUFFICIENT_BUYING_POWER` | 422 | The account does not have sufficient funds to place this order |
+| `INVALID_ORDER_STATE` | 422 | The order cannot be modified or cancelled in its current state |
+| `DUPLICATE_CLIENT_ORDER_ID` | 409 | An order with this `client_order_id` already exists |
+| `MARKET_CLOSED` | 422 | The market is closed and the order type does not support extended hours |
+| `SYMBOL_NOT_TRADABLE` | 422 | The requested symbol is not available for trading |
+
+### Funding errors
+
+| Error code | HTTP | Description |
+| --- | --- | --- |
+| `ACH_RELATIONSHIP_NOT_FOUND` | 404 | No ACH relationship exists with the given ID |
+| `ACH_RELATIONSHIP_NOT_APPROVED` | 422 | The ACH relationship has not yet been approved |
+| `INSUFFICIENT_BALANCE` | 422 | The account does not have sufficient settled cash for this withdrawal |
+| `FUNDING_ACTIVITY_NOT_FOUND` | 404 | No funding activity record found for the given ID |
+
+## Rate limits
+
+Buildmarkets enforces rate limits per API key, based on your partner tier. Two limits apply simultaneously — a per-second burst limit and a per-day total:
+
+| Tier | Requests per second | Requests per day |
+| --- | --- | --- |
+| Developer | 10 | 10,000 |
+| Growth | 50 | 100,000 |
+| Enterprise | 200 | 1,000,000 |
+
+Every response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and `X-RateLimit-Tier` headers so you can track your usage.
+
+When you exceed a rate limit, you receive a `429 Too Many Requests` response with a `Retry-After` header indicating how many seconds to wait before retrying:
+
+```text
+HTTP/1.1 429 Too Many Requests
+Retry-After: 2
+```
+
+Implement **exponential backoff** in your retry logic. Do not immediately hammer the API after receiving a 429.
+
+## Handling errors in practice
+
+### Always check the error code, not just the status
+
+Use the `code` field in the error body for programmatic error handling.
+
+```javascript
+const response = await fetch('.../orders', { method: 'POST', ... });
+if (!response.ok) {
+  const { error } = await response.json();
+  if (error.code === 'INSUFFICIENT_BUYING_POWER') {
+    // Show the user a "not enough funds" message
+  } else if (error.code === 'DUPLICATE_CLIENT_ORDER_ID') {
+    // This is likely a retry — fetch the existing order
+  } else {
+    // Log the request_id and alert your on-call team
+    console.error('Unexpected error', error.request_id);
+  }
+}
+```
+
+### Log request IDs
+
+Always log the `request_id` from error responses. When contacting Buildmarkets support, provide this ID so the support team can trace the request through internal systems.
+
+### Retry strategy
+
+- **400, 401, 403, 404, 409, 422** — Do not retry. These are deterministic errors that will not resolve with a retry.
+- **429** — Retry after the `Retry-After` delay.
+- **500, 503** — Retry with exponential backoff (e.g., 1s, 2s, 4s, 8s). After 3–5 retries, alert your operations team.

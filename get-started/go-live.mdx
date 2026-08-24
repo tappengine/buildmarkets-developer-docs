@@ -1,0 +1,66 @@
+---
+title: "Going Live"
+sidebarTitle: "Go Live"
+description: "Buildmarkets production readiness: sandbox vs production environments, real KYC, order routing, ACH funding, and regulatory and compliance obligations."
+---
+
+Buildmarkets is a white-label wealth management and brokerage infrastructure platform built for financial institutions. It provides the API layer that lets financial institutions offer investment accounts, equity and ETF trading, managed portfolios, and funding services directly within their own member- or customer-facing experiences — powered by a FINRA-registered broker-dealer and SEC-registered RIA.
+
+## Buildmarkets API Overview
+
+Buildmarkets APIs sit between your application and the underlying brokerage and clearing infrastructure. You interact with a single, unified REST API; Buildmarkets handles everything underneath:
+
+- **Account opening & KYC** — Identity verification, regulatory disclosures, and agreement capture
+- **Order routing** — Routing equity and ETF orders to market
+- **ACH funding** — Linking bank accounts and moving money in and out
+- **Market data** — Real-time quotes, historical bars, fundamentals, and reference data
+- **Document management** — Statements, tax forms, and compliance documents
+- **Webhooks** — Real-time event delivery for orders, accounts, and funding status changes
+
+## Platform Architecture
+
+Your Application (Member Portal, Mobile App, or Back-Office Integration) connects via REST API (HTTPS) using X-API-Key / X-API-Secret to the Buildmarkets API. The Buildmarkets API exposes modules for Accounts, Order Management, Portfolios, Market Data, Funding, Documents, Advisory, and Webhooks. Underneath, it connects to Clearing & Custody and Market Data Providers.
+
+## Who is Buildmarkets for?
+
+Buildmarkets is designed for **partners** — financial institutions that want to embed investing features into their product:
+
+| Partner type | Example use case |
+| --- | --- |
+| **Fintech apps** | Add a brokerage account tab to a personal finance app |
+| **Wealth platforms** | Power advisor-managed accounts with API-driven rebalancing |
+| **Challenger banks** | Offer stock trading alongside deposit accounts |
+| **Robo-advisors** | Automate goal-based portfolio construction and management |
+| **HR / benefits platforms** | Provide employee investment accounts as a workplace benefit |
+
+## Product Areas
+
+### Buildmarkets Wealth
+
+The core brokerage suite. Includes account management, equity and ETF trading, ACH funding, market data, and documents.
+
+### Buildmarkets FIX Gateway
+
+For partners with their own OMS or algorithmic trading infrastructure, Buildmarkets offers a FIX 4.2-compliant gateway for high-throughput order submission.
+
+## Environments
+
+| Attribute | Sandbox | Production |
+| --- | --- | --- |
+| **Purpose** | Integration development and QA | Live trading with real funds |
+| **Base URL** | `https://dev-tapp-api.tappengine.com` | `https://api.tappengine.com` |
+| **KYC** | Real KYC processing via secure identity verification system | Real KYC processing |
+| **Orders** | Simulated fills | Real order routing |
+| **Funding** | No real money moved | Real ACH transfers |
+
+## Regulatory & Compliance
+
+Buildmarkets's underlying brokerage infrastructure is operated through a registered broker-dealer and FINRA member. As a partner, you agree to Buildmarkets's partner program terms, which govern your use of the platform and your obligations with respect to customer accounts opened through your application.
+
+Refer to your partner agreement for specifics on your compliance obligations, including customer suitability, supervision, and recordkeeping requirements.
+
+## Next Steps
+
+- Introduction to Buildmarkets — Understand the key concepts and data model
+- Use Cases — See common integration patterns
+- Getting Started — Make your first API call

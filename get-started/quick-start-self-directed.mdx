@@ -1,0 +1,58 @@
+---
+title: "Quick Start: Self-Directed Investing"
+sidebarTitle: "Self-Directed"
+description: "A step-by-step walkthrough to make your first authenticated Buildmarkets API call, open an account, fund it, place an order, and check positions."
+---
+
+This guide enables users to make their first API call in under 10 minutes.
+
+## Prerequisites
+
+- A Buildmarkets partner account
+- Initial API key pair from onboarding or Partner Dashboard
+- `curl` or an HTTP client
+
+## Step 1: Confirm Your Credentials
+
+Authentication requires two headers:
+
+- `X-API-Key: <your-api-key>`
+- `X-API-Secret: <your-api-secret>`
+
+Test credentials via health endpoint. A `200 OK` response indicates success; `401` suggests credential issues.
+
+## Step 2: Open a Brokerage Account
+
+Create an account using POST request to `/v1/accounts` with account type, contact information, identity details, disclosures, agreements, investment profile, and government ID images (the `documents` array). KYC approval is determined by the identity-verification review and the clearing system's CIP screening — in both sandbox and production, the outcome depends on the submitted identity data, not on any special test values.
+
+Account response includes: `id`, `user_id`, `account_number`, `status`, `kyc_status`, `currency`, `created_at`, and `account_type`.
+
+A single user can hold multiple accounts. Keep the `user_id` from the response — once the user's KYC is approved, open additional accounts (e.g., an IRA alongside an individual account) via `POST /v1/users/{userId}/accounts` with just an `account_type`; document verification is skipped because the existing approval carries over.
+
+## Step 3: Link a Bank Account
+
+POST to `/v1/accounts/{accountId}/ach-relationships` with bank details including owner name, bank name, account type, routing number, and account number.
+
+Response includes: `id`, `status`, `bank_name`, `bank_account_type`, and `created_at`.
+
+## Step 4: Deposit Funds
+
+POST to `/v1/accounts/{accountId}/funding/deposits` using the ACH relationship ID, amount, and description. In sandbox, deposits settle immediately; production typically requires 1–3 business days.
+
+## Step 5: Place Your First Order
+
+POST to `/v1/accounts/{accountId}/orders` with `symbol`, `asset_class`, `order_type`, `side`, `quantity`, `time_in_force`, and `client_order_id`.
+
+Order response includes: `id`, `client_order_id`, `symbol`, `asset_class`, `order_type`, `side`, `quantity`, `status`, and `created_at`.
+
+## Step 6: Check Your Position
+
+GET `/v1/accounts/{accountId}/positions/{symbol}` to verify filled orders.
+
+## What's Next?
+
+- Authentication Overview
+- Account Opening (deep dive)
+- Placing Orders
+- Webhooks Overview
+- Error Codes

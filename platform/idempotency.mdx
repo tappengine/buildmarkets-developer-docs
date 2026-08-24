@@ -1,0 +1,78 @@
+---
+title: "Idempotency"
+sidebarTitle: "Idempotency"
+description: "How Buildmarkets uses client_order_id to make order requests idempotent so timed-out retries return the existing order instead of duplicating it."
+---
+
+## Introduction
+
+The Trading APIs enable you to place, modify, cancel, and list orders, plus view execution reports and transaction history. Buildmarkets supports **equity and ETF orders** with market and limit order types.
+
+## Trading Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/v1/accounts/{accountId}/orders` | Place a new order |
+| `GET` | `/v1/accounts/{accountId}/orders` | List all orders for an account |
+| `GET` | `/v1/accounts/{accountId}/orders/{orderId}` | Get order details |
+| `PATCH` | `/v1/accounts/{accountId}/orders/{orderId}` | Modify an open order |
+| `DELETE` | `/v1/accounts/{accountId}/orders/{orderId}` | Cancel an open order |
+| `GET` | `/v1/accounts/{accountId}/orders/{orderId}/executions` | Get execution reports (fills) |
+
+## Supported Asset Classes
+
+`equity` (Individual stocks — NYSE, NASDAQ, CBOE-listed) and `etf` (Exchange-traded funds).
+
+> **Note:** "Options, fixed income, and crypto are not currently supported through the REST Trading API."
+
+## Order Types
+
+`market` — Executes immediately at the best available price (requires `symbol`, `side`, `quantity` or `notional`). `limit` — Executes only at the specified price or better (requires `limit_price`).
+
+## Time-in-Force Options
+
+| `time_in_force` | Description |
+| --- | --- |
+| `day` | Active for the current trading day only. Cancels at market close if unfilled. |
+| `gtc` | Good Till Cancelled. Remains active until filled or manually cancelled. |
+| `opg` | Market-on-open. Executes at the opening auction price. |
+| `cls` | Market-on-close. Executes at the closing auction price. |
+| `ioc` | Immediate or Cancel. Fills whatever is immediately available; cancels the rest. |
+| `fok` | Fill or Kill. Fills the entire quantity immediately or cancels the entire order. |
+
+## Quantity vs. Notional
+
+Share-based uses `quantity` (e.g., `"quantity": "10"` — buy exactly 10 shares). Dollar-based uses `notional` (e.g., `"notional": "500.00"` — buy \$500 worth). "Use `notional` for fractional-share-like dollar-cost averaging experiences." Do not send both `quantity` and `notional` in the same request.
+
+## Extended Hours Trading
+
+Set `extended_hours: true` to allow execution during pre-market (4:00 AM–9:30 AM ET) and after-market (4:00 PM–8:00 PM ET) sessions. Extended hours trading is only supported for `limit` orders with `time_in_force: day`.
+
+```json
+{ "symbol": "AAPL", "asset_class": "equity", "order_type": "limit", "side": "buy", "quantity": "5", "limit_price": "180.00", "time_in_force": "day", "extended_hours": true }
+```
+
+## Order Lifecycle
+
+Orders transition through these states: `pending_new` → `new` → `partially_filled` → `filled`. Terminal/branch states include `cancelled`, `pending_cancel`, `rejected`, and `expired`.
+
+| State | Description |
+| --- | --- |
+| `pending_new` | Order received by Buildmarkets; being submitted to the market |
+| `new` | Order accepted by the exchange/market |
+| `partially_filled` | Some shares filled; remainder still working |
+| `filled` | Order is fully executed |
+| `cancelled` | Order was cancelled (by you or by the exchange) |
+| `pending_cancel` | Cancel request submitted, awaiting confirmation |
+| `rejected` | Order was rejected (e.g., insufficient funds, invalid symbol) |
+| `expired` | Day order reached end of session unfilled, or IOC/FOK not immediately filled |
+
+## Idempotency with `client_order_id`
+
+"Always include a `client_order_id` — a unique string you generate — on every order request." If your request times out and you retry, Buildmarkets returns the existing order rather than creating a duplicate. Recommended pattern: `{userId}-{symbol}-{action}-{date}-{sequence}`.
+
+## Next Steps
+
+- Placing Orders — Full request schema and code examples for all order types
+- Order Types & Parameters — Deep dive on each order type and when to use it
+- Webhooks Overview — Get notified when orders fill or change state

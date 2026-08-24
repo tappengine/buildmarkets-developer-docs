@@ -1,0 +1,214 @@
+# Buildmarkets API
+
+> White-label wealth management and brokerage infrastructure for financial institutions. Accounts, KYC, equity and ETF trading, ACH funding, market data, and documents — through a single unified REST API.
+
+Buildmarkets provides the API layer that lets financial institutions (fintechs, challenger banks, robo-advisors, wealth platforms, HR/benefits platforms) offer investment accounts, equity and ETF trading, managed portfolios, and funding services within their own experiences — powered by a FINRA-registered broker-dealer and SEC-registered RIA.
+
+## Base URLs
+
+- Sandbox: `https://dev-tapp-api.tappengine.com`
+- Production: `https://api.tappengine.com`
+
+All endpoints are prefixed with `/v1/`. Current stable version is v1.
+
+## Authentication
+
+Every request requires two headers:
+
+```
+X-API-Key: <your-api-key>
+X-API-Secret: <your-api-secret>
+```
+
+API keys are scoped: `accounts:read`, `accounts:write`, `funding:read`, `funding:write`, `trading:read`, `trading:write`, `marketdata:read`, `documents:read`, `documents:write`, `webhooks:read`, `webhooks:write`, `keys:manage`.
+
+Generate keys via the Partner Dashboard or `POST /v1/keys` with an existing key that has `keys:manage` scope. The `api_secret` is returned only once at creation.
+
+## Conventions
+
+- REST + JSON. Set `Content-Type: application/json`.
+- IDs are UUID strings (e.g., `"b3f2c9a1-4d5e-4a2f-8b3c-1e2d3f4a5b6c"`).
+- Timestamps are ISO 8601 UTC (e.g., `"2025-06-01T14:32:00Z"`).
+- Monetary amounts are decimal strings, not floats (e.g., `"1000.00"`).
+- Cursor-based pagination: `{ "data": [...], "pagination": { "next_cursor": "...", "has_more": true } }`. Use `cursor` and `limit` query params.
+- Rate limits: 10 req/s and 300 req/min per API key. `429` responses include `Retry-After` header.
+
+## Error Format
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "tax_id must be 9–11 characters",
+    "field": "identity.tax_id",
+    "request_id": "req_abc123xyz"
+  }
+}
+```
+
+4xx errors (400, 401, 403, 404, 409, 422): do not retry. 429: retry after `Retry-After`. 5xx: retry with exponential backoff.
+
+## Accounts
+
+Central resource. All trading, funding, and documents are scoped under accounts.
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/v1/accounts` | Create brokerage account (triggers KYC) |
+| GET | `/v1/accounts` | List accounts (paginated, filterable) |
+| GET | `/v1/accounts/{accountId}` | Get account details |
+| PATCH | `/v1/accounts/{accountId}` | Update mutable fields |
+| POST | `/v1/accounts/{accountId}/actions/close` | Close account (must have zero balance) |
+| GET | `/v1/accounts/{accountId}/balances` | Cash and equity balances |
+| GET | `/v1/accounts/{accountId}/positions` | All open positions |
+| GET | `/v1/accounts/{accountId}/positions/{symbol}` | Single position |
+
+Account types: `individual` (default), `joint`.
+
+Account statuses: SUBMITTED → ACTION_REQUIRED → APPROVAL_PENDING → APPROVED → ACTIVE → ACCOUNT_CLOSED. Also: REJECTED.
+
+KYC statuses: SUBMITTED, APPROVED, REJECTED, MANUAL_REVIEW.
+
+Sandbox KYC: SSN suffix `0001` = APPROVED, `0002` = REJECTED, `0003` = MANUAL_REVIEW.
+
+Required fields for account creation: `contact` (email, city, state, postal_code), `identity` (given_name, family_name, date_of_birth, tax_id), `investment_profile` (risk_tolerance, investment_objective, income/net_worth ranges), `agreements` (at minimum `customer_agreement` with `signed_at`).
+
+Optional: `disclosures`, `trading_configurations`, `trusted_contact`, `employment`, `corr_metadata` (freeform up to 255 chars for cross-system linking), `dividend_reinvestment`, `discretionary_account`, `advisor_code`, `registered_rep_code`.
+
+## Trading
+
+Supports equity and ETF orders. Options, fixed income, and crypto not supported via REST.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/accounts/{accountId}/orders` | Place order |
+| GET | `/v1/accounts/{accountId}/orders` | List orders |
+| GET | `/v1/accounts/{accountId}/orders/{orderId}` | Order details |
+| PATCH | `/v1/accounts/{accountId}/orders/{orderId}` | Modify open order |
+| DELETE | `/v1/accounts/{accountId}/orders/{orderId}` | Cancel open order |
+| GET | `/v1/accounts/{accountId}/orders/{orderId}/executions` | Execution reports |
+
+Order types: `market`, `limit` (requires `limit_price`).
+
+Time-in-force: `day`, `gtc`, `opg`, `cls`, `ioc`, `fok`.
+
+Quantity: use `quantity` for share-based or `notional` for dollar-based (fractional). Never both.
+
+Extended hours: `extended_hours: true` — limit orders with `time_in_force: day` only. Pre-market 4:00–9:30 AM ET, after-market 4:00–8:00 PM ET.
+
+Order lifecycle: `pending_new` → `new` → `partially_filled` → `filled`. Terminal states: `canceled`, `rejected`, `expired`.
+
+Idempotency: always include `client_order_id`. Retries return existing order. Pattern: `{userId}-{symbol}-{action}-{date}-{sequence}`.
+
+## Funding (ACH)
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| POST | `/v1/accounts/{accountId}/ach-relationships` | Link bank account |
+| GET | `/v1/accounts/{accountId}/ach-relationships` | List linked accounts |
+| DELETE | `/v1/accounts/{accountId}/ach-relationships/{achId}` | Remove link |
+| POST | `/v1/accounts/{accountId}/funding/deposits` | Initiate deposit |
+| POST | `/v1/accounts/{accountId}/funding/withdrawals` | Initiate withdrawal |
+| GET | `/v1/accounts/{accountId}/funding/activity` | All transactions |
+| GET | `/v1/accounts/{accountId}/funding/activity/{activityId}` | Single transaction |
+
+ACH statuses: QUEUED → PENDING → APPROVED (or REJECTED/CANCELLED).
+
+Funding statuses: PENDING → SETTLED (or FAILED/CANCELLED/RETURNED).
+
+Production ACH: 1–3 business days. Sandbox: instant. Equity sale proceeds settle T+1.
+
+## Market Data
+
+Included with integration — no separate subscription. Data sourced from QuoteMedia.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/v1/marketdata/real-time/{symbol}` | Live bid/ask/last quote |
+| GET | `/v1/marketdata/historical/{symbol}` | EOD OHLCV bars |
+| GET | `/v1/marketdata/company-profile/{symbol}` | Company details/fundamentals |
+| GET | `/v1/marketdata/balance-sheet/{symbol}` | Financial statements |
+| GET | `/v1/marketdata/cash-dividends/{symbol}` | Dividend history |
+| GET | `/v1/marketdata/news/{symbol}` | News/corporate actions |
+| GET | `/v1/marketdata/logos/{symbol}` | Company logo |
+| POST | `/v1/marketdata/reference/equity-security-master` | All tradeable equities |
+| POST | `/v1/marketdata/reference/symbol-details` | Bulk symbol details |
+| POST | `/v1/marketdata/reference/sector-symbols` | Symbols in a sector |
+| GET | `/v1/marketdata/reference/sectors` | All sectors |
+| GET | `/v1/marketdata/reference/industries` | All industries |
+
+Symbol formats: ticker (e.g., `AAPL`), `*CUSIP`, `*ISIN` (asterisk prefix).
+
+Market data endpoints are partner-level, not account-scoped.
+
+## Webhooks
+
+Real-time HTTP POST notifications for events. Recommended over polling.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/v1/webhooks` | Register endpoint |
+| GET | `/v1/webhooks` | List all |
+| GET | `/v1/webhooks/{webhookId}` | Get details |
+| PATCH | `/v1/webhooks/{webhookId}` | Update URL/events/status |
+| DELETE | `/v1/webhooks/{webhookId}` | Remove |
+| POST | `/v1/webhooks/{webhookId}/test` | Send test event |
+| GET | `/v1/webhooks/{webhookId}/deliveries` | Delivery history |
+
+Events include: `account.kyc_approved`, `account.closed`, `funding.deposit_completed`, `order.filled`, `order.cancelled`, `order.rejected`, `webhook.test`, and more.
+
+Pass empty `events` array to subscribe to all events. Signing secret returned only once at creation — store immediately.
+
+## Documents
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/v1/documents/types` | List document type classifications |
+| POST | `/v1/documents/list` | Retrieve/filter account documents |
+| POST | `/v1/documents/email` | Email documents |
+| POST | `/v1/documents/w9` | Generate W-9 |
+| POST | `/v1/accounts/{accountId}/documents/upload` | Upload compliance document |
+
+Upload accepts Base64-encoded files (max 10MB). Supported types: `identity_verification`, `address_verification`, `tax_id_verification`, `w8ben` (JSON via `content_data`), `w9`, and more.
+
+Account documents (statements, trade confirmations, tax forms) are system-generated with CDN URLs.
+
+## FIX Gateway
+
+FIX 4.4 protocol for institutional-grade, low-latency order management. Alternative to REST for high-volume partners with their own OMS/EMS.
+
+Outbound: New Order Single (D), New Order Multileg (AB), Order Cancel Request (F), Order Status Request (H).
+
+Inbound: Execution Report (8), Order Cancel Reject (9), Business Message Reject (j).
+
+Requires assigned host/port, SenderCompID, TargetCompID, heartbeat interval (30s recommended). Contact Buildmarkets support for setup.
+
+## Sandbox Testing
+
+Full sandbox at `https://dev-tapp-api.tappengine.com`. Same endpoints as production. No real money, orders, or KYC. KYC outcomes controlled by SSN suffix. Order fills and ACH transfers are simulated.
+
+## Documentation Links
+
+- [Home](https://docs.buildmarkets.com)
+- [Get Started](https://docs.buildmarkets.com/get-started/welcome)
+- [Platform Overview](https://docs.buildmarkets.com/platform/overview)
+- [Authentication](https://docs.buildmarkets.com/platform/authentication)
+- [Accounts](https://docs.buildmarkets.com/platform/accounts)
+- [Compliance & KYC](https://docs.buildmarkets.com/platform/compliance-kyc)
+- [Trading](https://docs.buildmarkets.com/platform/trading)
+- [Funding](https://docs.buildmarkets.com/platform/funding)
+- [Assets & Market Data](https://docs.buildmarkets.com/platform/assets)
+- [Positions](https://docs.buildmarkets.com/platform/positions)
+- [Webhooks](https://docs.buildmarkets.com/platform/webhooks)
+- [Error Handling](https://docs.buildmarkets.com/platform/errors)
+- [Idempotency](https://docs.buildmarkets.com/platform/idempotency)
+- [FIX Gateway](https://docs.buildmarkets.com/fix-gateway/fix-gateway-overview)
+- [Documents](https://docs.buildmarkets.com/documents/documents-overview)
+- [Wealth Management Use Cases](https://docs.buildmarkets.com/wealth)
+- [Error Codes Reference](https://docs.buildmarkets.com/resources/error-codes)
+- [Glossary](https://docs.buildmarkets.com/resources/glossary)
+- [Postman Collection](https://docs.buildmarkets.com/resources/postman)
+- [API Reference (OpenAPI)](https://docs.buildmarkets.com/api-reference/introduction)
+- [Changelog](https://docs.buildmarkets.com/changelog)
+- [Support](mailto:support@buildmarkets.ai)
+- [Status](https://status.buildmarkets.com)

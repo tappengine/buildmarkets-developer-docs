@@ -1,0 +1,496 @@
+---
+title: "Buildmarkets Developer CLI (bm)"
+sidebarTitle: "CLI"
+description: "The official command-line interface for the Buildmarkets brokerage API. A single static binary for macOS, Linux, and Windows."
+---
+
+The Buildmarkets developer CLI (`bm`) is a thin, scriptable command-line interface to the Buildmarkets brokerage API. It is designed for developers at terminals, CI/CD pipelines, and autonomous agent workflows.
+
+<Note>
+  The `bm` CLI is distributed as a single static binary for macOS, Linux, and Windows. This repository hosts the published binaries and installation tooling. The source code is maintained privately.
+</Note>
+
+---
+
+## Install & Setup
+
+Set up the CLI in under two minutes by following these steps:
+
+<Steps>
+  <Step title="Install the CLI">
+    Install the CLI on your machine using one of the following methods:
+
+    **macOS / Linux (curl)**
+
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/tappengine/buildmarketsuildmarkets-cli/main/install.sh | sh
+    ```
+
+    **macOS (Homebrew)**
+
+    ```bash
+    brew install tappengine/tap/bm
+    ```
+
+    **Windows / Manual** Download the latest binary for your operating system and architecture directly from the [GitHub Releases](https://github.com/tappengine/buildmarkets-cli/releases/latest) page.
+  </Step>
+  <Step title="Verify installation">
+    Ensure the binary is installed correctly and is accessible in your system path:
+
+    ```bash
+    bm --version
+    ```
+  </Step>
+  <Step title="Configure your environment">
+    Set the environment (sandbox, qa, or live) and authenticate using your partner API credentials:
+
+    ```bash
+    bm config set environment qa
+    ```
+
+    ```bash
+    bm config set api-key <your-api-key>
+    ```
+
+    ```bash
+    bm config set api-secret <your-api-secret>
+    ```
+  </Step>
+  <Step title="Verify connection">
+    Verify your current authenticated identity and environment:
+
+    ```bash
+    bm whoami
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Authentication
+
+The CLI supports two modes of authentication. Credentials are resolved in the following priority order (**first match wins**):
+
+| Priority | Source | Auth Type |
+| --- | --- | --- |
+| 1 | `--api-key` / `--api-secret` command flags | Partner / Machine-to-Machine |
+| 2 | `BUILDMARKETS_API_KEY` / `BUILDMARKETS_API_SECRET` env vars | Partner / Machine-to-Machine |
+| 3 | Keycloak token from running `bm login` | Trader / Individual Account |
+| 4 | Stored API credentials via `bm config` | Partner / Machine-to-Machine |
+
+### Partner / M2M Auth (API Key)
+
+Configure M2M credentials:
+
+```bash
+bm config set api-key tapp_sandbox_xxx
+```
+
+```bash
+bm config set api-secret sk_xxx
+```
+
+These credentials are sent as `X-API-Key` and `X-API-Secret` headers on every API request.
+
+### Trader Auth (OAuth Device Flow)
+
+For individual account/trader authentication:
+
+```bash
+bm login
+```
+
+This starts the OAuth device flow, printing a code and URL to approve in your web browser. Once approved, the JWT token is stored locally and sent as an `Authorization: Bearer <token>` header. The token refreshes automatically.
+
+```bash
+bm whoami
+```
+
+```bash
+bm logout
+```
+
+<Tip>
+  Credentials are safely stored in your operating system's native keychain (macOS Keychain, Windows Credential Manager, or libsecret). If no keychain is available, they fallback to a secure file at `~/.buildmarkets/config.yaml` with `0600` permissions.
+</Tip>
+
+---
+
+## Configuration & Environments
+
+View and modify your CLI settings:
+
+**Set environment:**
+
+```bash
+bm config set environment qa     # Options: sandbox | qa | live
+```
+
+**Get effective base URL:**
+
+```bash
+bm config get api-base-url
+```
+
+**List all configurations (secrets masked):**
+
+```bash
+bm config list
+```
+
+### Environment Mappings
+
+| Environment | Base URL |
+| --- | --- |
+| `sandbox` | `https://dev-tapp-api.tappengine.com` |
+| `qa` | `https://qa-tapp-api.tappengine.com` |
+| `live` | `https://tapp-api.tappengine.com` |
+
+### Environment Variables
+
+You can override any config setting at runtime using environment variables. This is the preferred method for CI/CD and automation pipelines:
+
+| Variable | Description |
+| --- | --- |
+| `BUILDMARKETS_ENV` | Override the current active environment (`sandbox`, `qa`, `live`). |
+| `BUILDMARKETS_API_KEY` / `_API_SECRET` | Override partner M2M authentication credentials. |
+| `BUILDMARKETS_API_BASE_URL` | Force a specific API gateway URL. |
+| `BUILDMARKETS_DEBUG` | Enable verbose request/response debugging output to `stderr`. |
+| `BUILDMARKETS_NON_INTERACTIVE` | Disable interactive prompts, animations, and ANSI color. |
+| `BUILDMARKETS_NO_UPDATE_CHECK` | Skip checking for new CLI versions on invocation. |
+
+---
+
+## Global Options & Conventions
+
+The following global flags can be supplied to any CLI command:
+
+| Flag | Purpose |
+| --- | --- |
+| `--json` / `--table` | Force output format (bypasses auto-detection). |
+| `--non-interactive` | Disable all terminal animations, color, and input prompts. |
+| `--yes` | Automatically accept confirmation prompts. |
+| `--api-key` / `--api-secret` | Pass partner API credentials for a single invocation. |
+| `--watch` / `--watch-interval <s>` | Poll a read command at an interval (defaults to 2 seconds). |
+| `--debug` | Output verbose API logging to `stderr`. |
+
+### Argument Conventions
+
+- **Target resource ID**: Always passed as a positional argument:
+  ```bash
+  bm accounts get <id>
+  ```
+- **Parent account scope**: Specified using the `--account` flag:
+  ```bash
+  bm orders list --account <id>
+  ```
+- **Creation data**: Supplied via specific flags or as a JSON string/file:
+  ```bash
+  bm orders place --symbol AAPL --side buy --qty 10
+  ```
+
+---
+
+## Output Formats & Exit Codes
+
+- **Interactive TTY**: Outputs styled tables.
+- **Piped/Redirected Output**: Automatically switches to JSON.
+- **Stream Monitoring**: Running a command with `--watch` piped to a script outputs **NDJSON** (Newlined-delimited JSON) for streaming parse compatibility.
+
+For example, to extract a specific JSON field:
+
+```bash
+bm marketdata quote AAPL --json | jq .data.lastPrice
+```
+
+### Process Exit Codes
+
+The `bm` CLI returns structured exit codes on failure so you can script control flows around them:
+
+| Exit Code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Generic execution error |
+| `2` | Validation error (invalid command arguments or flags) |
+| `3` | Authentication or authorization error |
+| `4` | Requested resource not found |
+| `5` | API rate limit exceeded |
+| `6` | Upstream clearing or banking gateway unavailable |
+
+---
+
+## Command Reference Summary
+
+Below are the most common CLI commands by resource category. For the complete, auto-generated list of all subcommands, options, and flags, see the exhaustive [CLI Command Reference](/resources/cli-reference).
+
+### System Status
+
+Unauthenticated readiness and health checks.
+
+**Check API Health:**
+
+```bash
+bm system health
+```
+
+**Check readiness:**
+
+```bash
+bm system ready
+```
+
+---
+
+### Brokerage Accounts
+
+Open, view, and manage customer accounts.
+
+**List accounts (filterable):**
+
+```bash
+bm accounts list --status ACTIVE --limit 25
+```
+
+**Get account details:**
+
+```bash
+bm accounts get TAPP-AFP-1257090
+```
+
+**Get account balances (cash, buying power, equity):**
+
+```bash
+bm accounts balances <id>
+```
+
+**Open a brokerage account interactively:**
+
+```bash
+bm accounts open --interactive
+```
+
+**Open an account using preconfigured JSON:**
+
+```bash
+bm accounts open --data @account.json
+```
+
+<Tip>
+  **Sandbox KYC Testing:** When opening accounts in the sandbox environment, using a `tax_id` ending in `0001` results in auto-approval, `0002` results in rejection, and `0003` puts the account in manual review.
+</Tip>
+
+---
+
+### Orders & Execution
+
+Place and manage equity and ETF orders.
+
+**Place a market buy order:**
+
+```bash
+bm orders place --account <id> --symbol AAPL --side buy --qty 10 --type market
+```
+
+**Place a limit buy order (GTC):**
+
+```bash
+bm orders place --account <id> --symbol MSFT --side buy --qty 5 --type limit --limit-price 410.00 --time-in-force gtc
+```
+
+**Place a dollar-based order (fractional shares):**
+
+```bash
+bm orders place --account <id> --symbol AAPL --side buy --notional 1000.00
+```
+
+**List open/working orders:**
+
+```bash
+bm orders list --account <id>
+```
+
+**Cancel a working order:**
+
+```bash
+bm orders cancel <order-id> --account <id>
+```
+
+---
+
+### Positions & Portfolio
+
+View cash and security holdings.
+
+**List all open positions:**
+
+```bash
+bm positions list --account <id>
+```
+
+**Get position details for a specific symbol:**
+
+```bash
+bm positions get AAPL --account <id>
+```
+
+**Liquidate all holdings (destructive market sell):**
+
+```bash
+bm positions close-all --account <id>
+```
+
+---
+
+### Money Movement (ACH)
+
+Link bank accounts and initiate funds transfers.
+
+**Link a bank account:**
+
+```bash
+bm funding ach link --account <id> \
+  --bank-account-owner-name "Sarah Martinez" \
+  --bank-account-type CHECKING \
+  --bank-routing-number 021000021 \
+  --bank-account-number 1234567890
+```
+
+**Initiate an ACH deposit:**
+
+```bash
+bm funding deposit --account <id> --ach <ach-id> --amount 1000.00 --description "Initial funding"
+```
+
+**Initiate an ACH withdrawal:**
+
+```bash
+bm funding withdraw --account <id> --ach <ach-id> --amount 500.00
+```
+
+---
+
+### Market Data
+
+Pull market quotes, corporate profiles, fundamentals, and historical charts.
+
+**Get real-time bid/ask/last price:**
+
+```bash
+bm marketdata quote AAPL
+```
+
+**Get historical EOD bars:**
+
+```bash
+bm marketdata historical AAPL --from 2026-01-01 --to 2026-05-01
+```
+
+**List options chain by expiration:**
+
+```bash
+bm marketdata options chain --symbol AAPL --expiration 2026-07-17
+```
+
+---
+
+### Webhook Management
+
+Manage real-time event webhooks.
+
+**Create a webhook registration:**
+
+```bash
+bm webhooks create --url https://partner.com/webhooks --events order.filled,account.kyc_approved
+```
+
+**Test a webhook registration (sends simulated event):**
+
+```bash
+bm webhooks test <id>
+```
+
+---
+
+## Developer Utility Commands
+
+### Live Webhook Tunneling (`bm webhooks tail`)
+
+Allows you to capture webhook events sent from your Buildmarkets tenant and stream them directly to your terminal or forward them to a local server without setting up an external proxy tunnel (like ngrok).
+
+**Stream events to terminal:**
+
+```bash
+bm webhooks tail
+```
+
+**Forward events to a local endpoint:**
+
+```bash
+bm webhooks tail --forward-to http://localhost:4242/webhooks --filter 'order.*'
+```
+
+### Live Request Logging (`bm logs tail`)
+
+Streams live API request and response diagnostics for your tenant in real-time. Useful for debugging errors during development.
+
+**Filter logs by POST method, error status, and path:**
+
+```bash
+bm logs tail --method POST --status 4xx --path '/v1/accounts/*'
+```
+
+### Sandbox Resetting (`bm dev sandbox reset`)
+
+Resets and reseeds your sandbox tenant back to fresh fixtures.
+
+**Wipe and load full fixture set (refuses to run on live environments):**
+
+```bash
+bm dev sandbox reset --seed full --yes
+```
+
+### Broker Migration Tool (`bm migrate from-alpaca`)
+
+Automates migrating accounts, ACH links, and configurations from the Alpaca Broker API to Buildmarkets in a two-phase (plan -\> apply) journaled operation.
+
+**Phase 1: Generate dry-run migration plan:**
+
+```bash
+bm migrate from-alpaca plan --alpaca-key $KEY --alpaca-secret $SECRET --output ./plan.json
+```
+
+**Phase 2: Execute and apply migration plan:**
+
+```bash
+bm migrate from-alpaca apply ./plan.json
+```
+
+---
+
+## Scripting & Automation Recipes
+
+The CLI is optimized for shell scripts, backend automation, and cron jobs.
+
+### Run in non-interactive JSON mode
+
+```bash
+export BUILDMARKETS_NON_INTERACTIVE=1
+```
+
+```bash
+bm marketdata quote AAPL --json | jq -er '.data.lastPrice'
+```
+
+### Capture an order ID from creation response
+
+```bash
+oid=$(bm orders place --account "$ACC" --symbol AAPL --side buy --qty 1 --json | jq -r '.id')
+```
+
+### Loop and process streaming order updates
+
+```bash
+bm orders list --account "$ACC" --watch --json | while read -r line; do
+  echo "$line" | jq '.status'
+done
+```
