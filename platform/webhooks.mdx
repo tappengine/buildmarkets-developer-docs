@@ -64,7 +64,11 @@ Registers a new HTTPS endpoint to receive events. Pass an empty `events` array t
 | `events` | array of strings | Subscribed event types (empty = all) |
 | `status` | string | Webhook status: `active` or `disabled` |
 | `secret` | string | **Shown only once.** HMAC signing secret — store this securely immediately |
+| `last_delivery_at` | string (ISO 8601) \| null | When this endpoint last received a successful delivery. `null` until the first one |
+| `last_failure_at` | string (ISO 8601) \| null | When this endpoint last failed a delivery. `null` if it never has |
+| `failure_count_24h` | integer | Failed delivery attempts in the last 24 hours |
 | `created_at` | string (ISO 8601) | Registration timestamp |
+| `updated_at` | string (ISO 8601) | When the webhook was last modified |
 
 > ⚠️ **Store the `secret` now.** It is returned exactly once in the `201` response and cannot be retrieved again. If lost, the webhook must be deleted and recreated.
 
@@ -102,7 +106,7 @@ curl -X POST https://api.tappengine.com/v1/webhooks \
 
 ```json
 {
-  "id": "wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+  "id": "a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
   "url": "https://myapp.com/webhooks/buildmarkets",
   "events": [
     "account.kyc_approved",
@@ -113,7 +117,11 @@ curl -X POST https://api.tappengine.com/v1/webhooks \
   ],
   "status": "active",
   "secret": "whsec_xK9mP2qR7tNvL4jW8cB5yZ3hF6dE1sA0",
-  "created_at": "2026-03-24T10:00:00Z"
+  "last_delivery_at": null,
+  "last_failure_at": null,
+  "failure_count_24h": 0,
+  "created_at": "2026-03-24T10:00:00Z",
+  "updated_at": "2026-03-24T10:00:00Z"
 }
 ```
 
@@ -135,16 +143,29 @@ curl https://api.tappengine.com/v1/webhooks \
 #### Example response
 
 ```json
-[
-  {
-    "id": "wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
-    "url": "https://myapp.com/webhooks/buildmarkets",
-    "events": ["account.kyc_approved", "order.filled"],
-    "status": "active",
-    "created_at": "2026-03-24T10:00:00Z"
+{
+  "data": [
+    {
+      "id": "a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6",
+      "url": "https://myapp.com/webhooks/buildmarkets",
+      "events": ["account.kyc_approved", "order.filled"],
+      "status": "active",
+      "last_delivery_at": "2026-03-24T14:32:04Z",
+      "last_failure_at": null,
+      "failure_count_24h": 0,
+      "created_at": "2026-03-24T10:00:00Z",
+      "updated_at": "2026-03-24T10:00:00Z"
+    }
+  ],
+  "pagination": {
+    "next_cursor": null,
+    "has_more": false,
+    "count": 1
   }
-]
+}
 ```
+
+List responses are wrapped in a `data` array with a `pagination` object — they are not a bare array. Pass `limit` and `cursor` query parameters to page through results.
 
 > **Note:** The `secret` field is **not** included in list or get responses — only in the initial `201` creation response.
 
@@ -165,7 +186,7 @@ Returns the configuration for a single registered webhook by ID. The signing `se
 #### Example request
 
 ```bash
-curl https://api.tappengine.com/v1/webhooks/wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
+curl https://api.tappengine.com/v1/webhooks/a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
   -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET"
 ```
 
@@ -194,7 +215,7 @@ Updates the URL, subscribed events, or status of an existing webhook. Only inclu
 #### Example request — disable a webhook temporarily
 
 ```bash
-curl -X PATCH https://api.tappengine.com/v1/webhooks/wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
+curl -X PATCH https://api.tappengine.com/v1/webhooks/a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
   -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET" \
   -H "Content-Type: application/json" \
   -d '{"status": "disabled"}'
@@ -203,7 +224,7 @@ curl -X PATCH https://api.tappengine.com/v1/webhooks/wh_a1b2c3d4-e5f6-7a8b-9c0d-
 #### Example request — update URL and event subscriptions
 
 ```bash
-curl -X PATCH https://api.tappengine.com/v1/webhooks/wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
+curl -X PATCH https://api.tappengine.com/v1/webhooks/a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
   -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET" \
   -H "Content-Type: application/json" \
   -d '{
@@ -229,11 +250,11 @@ Triggers a synthetic test payload to be sent to the webhook's registered URL. Us
 #### Example request
 
 ```bash
-curl -X POST https://api.tappengine.com/v1/webhooks/wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6/test \
+curl -X POST https://api.tappengine.com/v1/webhooks/a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6/test \
   -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET"
 ```
 
-Buildmarkets sends a test payload with `"event_type": "webhook.test"` to the registered URL. Your endpoint should respond with a `2xx` status. Check the [delivery history](/guides/operations/webhook-setup) to see whether it was received successfully.
+Buildmarkets sends a test payload with `"event_type": "system.maintenance_scheduled"` to the registered URL, carrying a `data` object with `message`, `scheduled_at`, and `estimated_duration_minutes`. It is signed with the same HMAC scheme as a real event, so it exercises your signature verification. Your endpoint should respond with a `2xx` status. Check the [delivery history](/guides/operations/webhook-setup) to see whether it was received successfully.
 
 ---
 
@@ -248,7 +269,7 @@ Returns `204 No Content` on success.
 #### Example request
 
 ```bash
-curl -X DELETE https://api.tappengine.com/v1/webhooks/wh_a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
+curl -X DELETE https://api.tappengine.com/v1/webhooks/a1b2c3d4-e5f6-7a8b-9c0d-e1f2a3b4c5d6 \
   -H "X-API-Key: $BUILDMARKETS_API_KEY" -H "X-API-Secret: $BUILDMARKETS_API_SECRET"
 ```
 
