@@ -53,7 +53,29 @@ Registers a new HTTPS endpoint to receive events. Pass an empty `events` array t
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `url` | string (URI) | ✅ | HTTPS URL where Buildmarkets will POST event payloads. Must be a valid `https://` URL |
-| `events` | array of strings | ✅ | Event types to subscribe to. Pass an empty array `[]` to receive all events. See [Webhook Events Reference](/guides/operations/webhook-setup) for valid values |
+| `events` | array of strings | ✅ | Event types to subscribe to. Pass an empty array `[]` to receive all events. Must be one of the [valid event types](#valid-event-types) below |
+
+#### Valid event types
+
+Any value in `events` must be one of the following. An unrecognised event name is rejected with `400`.
+
+| Domain | Event | When it fires |
+| --- | --- | --- |
+| Account | `account.kyc_approved` | KYC review passed; account is now `ACTIVE` |
+| Account | `account.kyc_rejected` | KYC review failed; account is now `ACTION_REQUIRED` |
+| Account | `account.closed` | Account has been successfully closed |
+| Funding | `funding.ach_relationship_created` | An ACH relationship has been created and approved |
+| Funding | `funding.ach_relationship_removed` | An ACH relationship has been cancelled |
+| Funding | `funding.deposit_completed` | An ACH deposit has fully settled |
+| Funding | `funding.deposit_returned` | An ACH deposit was returned by the bank |
+| Funding | `funding.withdrawal_completed` | An ACH withdrawal has fully settled |
+| Funding | `funding.withdrawal_returned` | An ACH withdrawal was returned by the bank |
+| Trading | `order.submitted` | An order was accepted and submitted to the market |
+| Trading | `order.filled` | An order was fully executed |
+| Trading | `order.rejected` | An order was rejected before or during execution |
+| Trading | `order.cancelled` | An order was cancelled (user-initiated or system) |
+
+For the full payload each event delivers, see the [Webhook Events Reference](/guides/operations/webhook-setup).
 
 #### Response body (`201 Created`)
 
@@ -188,7 +210,7 @@ Updates the URL, subscribed events, or status of an existing webhook. Only inclu
 | Field | Type | Description |
 | --- | --- | --- |
 | `url` | string | New HTTPS URL to deliver events to |
-| `events` | array of strings | Updated list of subscribed event types |
+| `events` | array of strings | Updated list of subscribed event types. Replaces the existing list. Same [valid event types](#valid-event-types) as on create |
 | `status` | string | `active` to enable delivery, `disabled` to pause it |
 
 #### Example request — disable a webhook temporarily
