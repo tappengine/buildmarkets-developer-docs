@@ -34,6 +34,19 @@ curl https://dev-tapp-api.tappengine.com/v1/accounts \
 
 > **Note:** `Authorization: Bearer <token>` is reserved for user-facing OAuth/JWT flows (e.g., the CLI's device login). Passing an API key as a Bearer token is **not** supported.
 
+## Token types
+
+Two kinds of credential can authenticate a request. Both travel in the same `X-API-Key` / `X-API-Secret` headers — they differ in what they can reach.
+
+| | Partner key | Account token |
+| --- | --- | --- |
+| Prefix | `tapp_…` | `tappacct_…` |
+| Reach | Every account and partner-level resource you own | Exactly one account |
+| Issued by | Buildmarkets — email request or `POST /v1/keys` | You — `POST /v1/accounts/{accountId}/keys` |
+| Typical use | Your backend services | End-user-facing clients, MCP `account` role |
+
+An account token is bound to one `accountId` at the authentication layer: the API scopes every request to that account automatically, so the token cannot read or act on any other account even if it asks. See [Account-scoped tokens](#account-scoped-tokens) for how to issue one.
+
 ## API key scopes
 
 When generating an API key, you assign it one or more **scopes** that control which endpoints it can access. This follows the principle of least privilege.
@@ -49,11 +62,12 @@ When generating an API key, you assign it one or more **scopes** that control wh
 | `marketdata:read` | Access market data endpoints |
 | `documents:read` | List and retrieve documents |
 | `documents:write` | Upload and email documents |
-| `webhooks:read` | List webhook configurations |
-| `webhooks:write` | Create, update, and delete webhooks |
-| `keys:manage` | Generate and revoke API keys |
+| `admin:webhooks` | Create, update, and delete webhook endpoints |
+| `admin:keys` | Generate and revoke partner API keys and account tokens |
 
 > **Important:** "Assign only the scopes your application needs. A compromised key with narrow scopes limits your exposure."
+
+This table covers the scopes used by the endpoints documented here. Additional scopes exist for managed accounts, fee billing, KYC/KYB, reporting, and compliance — contact [support@buildmarkets.ai](mailto:support@buildmarkets.ai) if your integration needs them.
 
 ## Requesting API keys
 
@@ -70,7 +84,7 @@ Buildmarkets API keys are provisioned and distributed via email. To request a ne
 
 ### Via the API
 
-You can also generate keys programmatically using an existing key that has the `keys:manage` scope:
+You can also generate keys programmatically using an existing key that has the `admin:keys` scope:
 
 ```bash
 curl -X POST https://dev-tapp-api.tappengine.com/v1/keys \
@@ -122,11 +136,118 @@ curl -X DELETE https://dev-tapp-api.tappengine.com/v1/keys/{keyId} \
 
 Returns `204 No Content` on success. Revoked keys are immediately invalidated — any in-flight requests using the revoked key will fail with `401 Unauthorized`.
 
+## Account-scoped tokens
+
+An **account token** (`tappacct_*`) can only act on the single account it was issued for. Use one when a credential has to live somewhere you do not fully control — a mobile app, a browser client, or an MCP client connecting as the `account` role.
+
+All three endpoints require the `admin:keys` scope on the partner key making the call. The account must already be `ACTIVE` — mint the token after KYC completes, not at account-creation time.
+
+### Issuing a token
+
+`POST /v1/accounts/{accountId}/keys`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `scopes` | array of strings | ✅ | Scopes granted to the token. Must be non-empty; unknown scope names are rejected with `INVALID_SCOPE` |
+| `label` | string |  | Human-readable label to identify the token when listing or revoking |
+| `environment` | string |  | `live` or `sandbox`. Defaults to `sandbox` |
+| `expiresAt` | string (ISO 8601) |  | Optional expiry. The token is rejected after this time |
+
+```bash
+curl -X POST https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID/keys \
+  -H "X-API-Key: YOUR_PARTNER_KEY" \
+  -H "X-API-Secret: YOUR_PARTNER_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scopes": ["accounts:read", "funding:read", "trading:read", "trading:write"],
+    "label": "mobile-app-token",
+    "environment": "sandbox"
+  }'
+```
+
+**Response (`201 Created`):**
+
+```json
+{
+  "data": {
+    "token_id": "9f1c2b7e-4d3a-4c8b-9e6f-1a2b3c4d5e6f",
+    "account_id": "b3f2c9a1-7d4e-4f8a-9c1b-2e3d4f5a6b7c",
+    "key": "tappacct_sandbox_c5c283401669b1e216dc49aeb2cb8aca0570366588aa5342a346f6863ffddfb5",
+    "secret": "sk_…",
+    "scopes": ["accounts:read", "funding:read", "trading:read", "trading:write"],
+    "expires_at": null,
+    "created_at": "2026-08-24T12:00:00Z",
+    "warning": "Store this secret securely. It will not be shown again."
+  }
+}
+```
+
+> **Security note:** The `secret` is returned exactly once. It cannot be retrieved afterwards — if it is lost, revoke the token and issue a new one.
+
+| Status | Meaning |
+| --- | --- |
+| `400` | `INVALID_REQUEST` (empty `scopes` or bad `environment`) or `INVALID_SCOPE` (unknown scope name) |
+| `403` | The calling partner key lacks `admin:keys` |
+| `404` | Account not found, or not owned by this partner |
+
+### Listing tokens
+
+`GET /v1/accounts/{accountId}/keys`
+
+Accepts `limit` and `offset` query parameters. Returns metadata only — `token_id`, `key_prefix`, `label`, `scopes`, `status` (`active` / `revoked` / `expired`), `expires_at`, `last_used_at`, `created_at`, `revoked_at` — plus a `pagination` object. The secret is never included.
+
+```bash
+curl "https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID/keys?limit=20&offset=0" \
+  -H "X-API-Key: YOUR_PARTNER_KEY" -H "X-API-Secret: YOUR_PARTNER_SECRET"
+```
+
+### Revoking a token
+
+`DELETE /v1/accounts/{accountId}/keys/{tokenId}`
+
+```bash
+curl -X DELETE https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID/keys/TOKEN_ID \
+  -H "X-API-Key: YOUR_PARTNER_KEY" -H "X-API-Secret: YOUR_PARTNER_SECRET"
+```
+
+Revocation takes effect immediately — any further request using that token fails with `401 Unauthorized`.
+
+### Using a token with the MCP
+
+The [Brokerage MCP](/resources/mcp) authenticates its `account` role with exactly this kind of token. Mint one covering the tools you intend to expose:
+
+```bash
+curl -X POST https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID/keys \
+  -H "X-API-Key: YOUR_PARTNER_KEY" -H "X-API-Secret: YOUR_PARTNER_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "label": "claude-code",
+    "environment": "sandbox",
+    "scopes": [
+      "accounts:read", "accounts:write",
+      "funding:read", "funding:write",
+      "trading:read", "trading:write",
+      "marketdata:read"
+    ]
+  }'
+```
+
+Then pass the returned `key` and `secret` to your MCP client as the `account` role:
+
+```bash
+claude mcp add --transport http tapp https://dev-mcp-api.tappengine.com/mcp \
+  --header "X-API-Key: tappacct_…" \
+  --header "X-API-Secret: sk_…" \
+  --header "X-User-Type: account"
+```
+
+A token missing a scope simply means the matching tools are unavailable to that client — narrow the `scopes` array to narrow what the assistant can do.
+
 ## Security best practices
 
 | Practice | Guidance |
 | --- | --- |
-| **Never expose keys client-side** | API keys should only be used in server-side code. Never include them in mobile app bundles, browser JavaScript, or public repositories. |
+| **Never expose partner keys client-side** | Partner keys (`tapp_*`) should only be used in server-side code — never in mobile app bundles, browser JavaScript, or public repositories. Where an end-user client needs to call the API directly, issue an [account token](#account-scoped-tokens) instead. |
 | **Use separate keys per environment** | Use distinct key pairs for sandbox and production. |
 | **Rotate keys regularly** | Generate a new key, update your application config, then revoke the old key. |
 | **Scope keys minimally** | Only request the scopes your specific service requires. |
