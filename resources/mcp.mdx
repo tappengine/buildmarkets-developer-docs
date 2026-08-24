@@ -71,27 +71,7 @@ As an **account** user you never have to pass an account ID — the MCP knows wh
 
 These three values are sent on every request as the headers `X-API-Key`, `X-API-Secret`, and `X-User-Type`.
 
-### Getting an account token
-
-A `partner` key is issued to you by TAPP Engine. An **account token** (`tappacct_…`) is one you mint yourself, against an account that is already `ACTIVE`, using your partner key:
-
-```bash
-curl -X POST https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID/keys \
-  -H "X-API-Key: YOUR_PARTNER_KEY" -H "X-API-Secret: YOUR_PARTNER_SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "label": "claude-code",
-    "environment": "sandbox",
-    "scopes": [
-      "accounts:read", "accounts:write",
-      "funding:read", "funding:write",
-      "trading:read", "trading:write",
-      "marketdata:read"
-    ]
-  }'
-```
-
-The response returns `key` and `secret` — the **secret is shown exactly once**. Use them as `X-API-Key` and `X-API-Secret` below. The token can only ever act on the one account it was issued for. See [Account-scoped tokens](/platform/authentication#account-scoped-tokens) for the full reference, including listing and revoking.
+A `partner` key is issued to you by TAPP Engine. An **account token** (`tappacct_…`) is one you mint yourself against an already-`ACTIVE` account, using your partner key — see [Account-scoped tokens](/platform/authentication#account-scoped-tokens) for how to issue, list, and revoke them.
 
 ---
 
