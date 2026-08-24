@@ -140,7 +140,7 @@ Returns `204 No Content` on success. Revoked keys are immediately invalidated �
 
 An **account token** (`tappacct_*`) can only act on the single account it was issued for. Use one when a credential has to live somewhere you do not fully control — a mobile app, a browser client, or an MCP client connecting as the `account` role.
 
-All three endpoints require the `admin:keys` scope on the partner key making the call.
+All three endpoints require the `admin:keys` scope on the partner key making the call. The account must already be `ACTIVE` — mint the token after KYC completes, not at account-creation time.
 
 ### Issuing a token
 
@@ -211,6 +211,37 @@ curl -X DELETE https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID/keys/T
 ```
 
 Revocation takes effect immediately — any further request using that token fails with `401 Unauthorized`.
+
+### Using a token with the MCP
+
+The [Brokerage MCP](/resources/mcp) authenticates its `account` role with exactly this kind of token. Mint one covering the tools you intend to expose:
+
+```bash
+curl -X POST https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID/keys \
+  -H "X-API-Key: YOUR_PARTNER_KEY" -H "X-API-Secret: YOUR_PARTNER_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "label": "claude-code",
+    "environment": "sandbox",
+    "scopes": [
+      "accounts:read", "accounts:write",
+      "funding:read", "funding:write",
+      "trading:read", "trading:write",
+      "marketdata:read"
+    ]
+  }'
+```
+
+Then pass the returned `key` and `secret` to your MCP client as the `account` role:
+
+```bash
+claude mcp add --transport http tapp https://dev-mcp-api.tappengine.com/mcp \
+  --header "X-API-Key: tappacct_…" \
+  --header "X-API-Secret: sk_…" \
+  --header "X-User-Type: account"
+```
+
+A token missing a scope simply means the matching tools are unavailable to that client — narrow the `scopes` array to narrow what the assistant can do.
 
 ## Security best practices
 
