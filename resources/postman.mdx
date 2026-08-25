@@ -4,7 +4,7 @@ sidebarTitle: "Postman"
 description: "Import the Buildmarkets Postman collection to run every API endpoint with pre-configured authentication, environment variables, and example payloads."
 ---
 
-The Buildmarkets Postman collection gives you 124 ready-to-run requests organized across 23 folders — one for each API domain. Import it, set three environment variables, and you're making live sandbox calls in under two minutes.
+The Buildmarkets Postman collection gives you ready-to-run requests organized into folders — one for each API domain. Import it, set three environment variables, and you're making live sandbox calls in under two minutes.
 
 ## Quick setup
 
@@ -17,38 +17,31 @@ The Buildmarkets Postman collection gives you 124 ready-to-run requests organize
 
     | Variable | Value |
     | --- | --- |
-    | `baseUrl` | `https://dev-tapp-api.tappengine.com/v1` |
+    | `baseUrl` | `https://dev-tapp-api.tappengine.com` — preset; note there is no `/v1` suffix, each request adds its own path |
     | `apiKey` | Your sandbox API key |
     | `apiSecret` | Your sandbox API secret |
 
     Select the environment from the dropdown in the top-right corner of Postman before sending any requests.
   </Step>
   <Step title="Run your first request">
-    Open the **Assets → List Assets** request and click **Send**. You should see a paginated list of tradable assets returned from the sandbox.
+    Open the **Market Data → Real-time price** request and click **Send**. It uses the preset `symbol` variable (`AAPL`), so it works before you have created any accounts.
   </Step>
 </Steps>
 
 ## Collection contents
 
-The collection is organized by API domain, with folders that map directly to the OpenAPI `tags` — so the collection always stays in sync with the spec.
+The collection is organized by API domain:
 
 | Folder | Requests |
 | --- | --- |
-| **Investors** | Create, list, get, close investors; wallets, transactions, portfolio chart, trusted contact |
-| **Compliance** | Submit a check result, restart a workflow, poll workflow status |
-| **Funding Sources** | List / connect / disconnect funding sources, Plaid Link token, PATCH wire-payout details |
-| **Transfers** | Create, list, get, and cancel deposits and withdrawals; download wire-details PDF |
-| **Trading** | Order estimates, place / list / get / cancel orders |
-| **Positions** | List positions; get position detail |
-| **Assets** | Search, list, get-by-symbol, historical chart bars |
-| **Markets** | Reference data: status, calendar, halts, sessions |
-| **Market Data** | Quotes, snapshots, bars, search (paywalled) |
-| **Document Management** | Upload, list, get, download, delete documents |
-| **Webhooks** | Register, list, update, delete webhooks; list event types |
-| **Investor Profile / Dependents / Risk Assessment / Goals / Life Events / External Accounts / Financial Plan / Investment Policy** | Wealth platform onboarding and planning |
-| **Portfolio Management / Auto-Invest / Insights & Recommendations / Reports** | Wealth platform portfolio management |
-
-**Total: 23 folders, 124 requests.**
+| **API Keys** | Generate, list, and revoke partner API keys |
+| **Accounts** | Create an account, create an additional account for an existing user, list, get, update, close; balances and positions |
+| **Account Tokens** | Create, list, and revoke account-scoped `tappacct_*` tokens |
+| **Funding** | Link a bank account, list and remove ACH relationships, ACH deposits and withdrawals, funding activity |
+| **Trading** | Place, list, get, modify, and cancel orders; execution reports |
+| **Webhooks** | Create, list, get, update, and delete webhooks; send a test event; list delivery attempts |
+| **Market Data** | Quotes, historical data, company profile, dividends, news, sectors and industries, security master, and options reference |
+| **Documents** | List supported documents, upload, retrieve, email, and request a W-9 |
 
 ## Collection variables
 
@@ -56,14 +49,16 @@ The collection uses variables for resource IDs. After creating a resource, updat
 
 | Variable | Set after |
 | --- | --- |
-| `investor_id` | Creating an investor (prefixed `inv_…`) |
-| `document_id` | Uploading a document (prefixed `doc_…`) |
-| `order_id` | Placing an order (prefixed `ord_…`) |
-| `deposit_id` | Creating a deposit (prefixed `dep_…`) |
-| `withdrawal_id` | Creating a withdrawal (prefixed `wdr_…`) |
-| `id` | Funding source (prefixed `fs_…`) — used by PATCH / DELETE funding-source |
-| `webhook_id` | Registering a webhook |
-| `portfolio_id` | Creating a portfolio |
+| `accountId` | Creating an account |
+| `orderId` | Placing an order |
+| `webhookId` | Creating a webhook endpoint |
+| `keyId` | Generating an API key |
+| `achId` | Linking a bank account |
+| `activityId` | Creating a deposit or withdrawal |
+| `userId` | Creating an account, when adding additional accounts for the same user |
+| `id` | Generic ID used by a few requests |
+
+`symbol`, `underlying`, and `contract` come preset (`AAPL`, `AAPL`, and a sample option contract) so market-data requests run without setup.
 
 <Tip>
   Use Postman's **Tests** tab to write a post-request script that automatically extracts the ID from each response and sets the corresponding collection variable. This lets you chain requests without manual copy-pasting.
@@ -74,7 +69,7 @@ The collection uses variables for resource IDs. After creating a resource, updat
 To switch from sandbox to production:
 
 1. Create a new Postman environment
-2. Set `baseUrl` to `https://api.tappengine.com/v1`
+2. Set `baseUrl` to `https://api.tappengine.com` (no `/v1` suffix)
 3. Enter your production API key and secret
 4. Select the production environment from the dropdown before sending requests
 
