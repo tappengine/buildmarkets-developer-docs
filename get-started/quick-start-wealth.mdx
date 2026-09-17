@@ -23,7 +23,7 @@ description: "Common Buildmarkets integration patterns for embedded brokerage, r
 
 **Key account fields:** `account_type: "individual"`, `investment_profile`, `agreements`, `documents` (government ID images for identity verification). **Key order fields:** `symbol`, `asset_class` (`equity` or `etf`), `order_type`, `side`, `quantity` or `notional`, `client_order_id`.
 
-**Multiple accounts per user:** a single user can hold several accounts. Keep the `user_id` from the account response — once the user's KYC is approved, open additional accounts (for example an `ira_roth` alongside their `individual` account) via `POST /v1/users/{userId}/accounts` with just an `account_type`. Document verification is skipped because the existing approval carries over.
+**Multiple accounts per user:** a single user can hold several accounts. Keep the `user_id` from the account response — once the user's KYC is approved, open additional accounts (for example an `ira_roth` alongside their `individual` account) via `POST /v1/users/{userId}/accounts` with just an `account_type` (plus `joint_owner` for a joint account). Document verification is skipped because the existing approval carries over.
 
 ## 2. Robo-advisor / automated investing
 

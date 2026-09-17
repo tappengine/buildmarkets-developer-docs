@@ -15,9 +15,9 @@ A Buildmarkets account is "a fully-managed brokerage account for one of your end
 ## Account Types
 
 - **individual** — Standard individual brokerage account (default)
-- **joint** — Joint account requiring a `joint_owner` object in the creation request
-- **ira\_traditional** — Traditional IRA retirement account
-- **ira\_roth** — Roth IRA retirement account
+- **joint** — Joint account. Requires a `joint_owner` object describing the second account holder, on both `POST /v1/accounts` and `POST /v1/users/{userId}/accounts`
+- **ira\_traditional** — Traditional IRA retirement account. The IRA agreement is recorded automatically; you do not send it
+- **ira\_roth** — Roth IRA retirement account. The IRA agreement is recorded automatically; you do not send it
 - **custodial** — Custodial account opened on behalf of a minor
 
 ## Account Endpoints
@@ -40,7 +40,7 @@ Each account belongs to a **user** — the verified person behind it. The first 
 
 Once any of a user's accounts passes KYC, the user is considered KYC-approved and can open additional accounts without repeating document verification:
 
-- Call `POST /v1/users/{userId}/accounts` with only the `account_type` (e.g., a second `individual` account, or an `ira_roth` alongside an existing `individual`).
+- Call `POST /v1/users/{userId}/accounts` with only the `account_type` (e.g., a second `individual` account, or an `ira_roth` alongside an existing `individual`). A `joint` account also needs a `joint_owner` object.
 - Identity fields are locked to the stored, verified user profile — sending an `identity` object is rejected.
 - Optional sections (`contact`, `disclosures`, `agreements`, `investment_profile`, etc.) may be provided to override the stored values; anything omitted falls back to the user's profile.
 - Document verification is skipped — the existing KYC approval carries over, and the account is booked on the clearing system directly.
