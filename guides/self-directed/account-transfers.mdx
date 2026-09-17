@@ -1,0 +1,207 @@
+---
+title: "Account Transfers (ACATS)"
+sidebarTitle: "Account Transfers (ACATS)"
+description: "Bring a customer's existing brokerage account over from another firm with an incoming ACATS transfer, then track it through settlement."
+---
+
+An **ACATS transfer** moves a customer's holdings from another US broker-dealer into their Buildmarkets account through the NSCC's Automated Customer Account Transfer Service. Use it when a customer already holds positions elsewhere and wants to consolidate them with you, rather than selling and re-buying.
+
+Buildmarkets supports **incoming, full-account** transfers:
+
+- **Incoming** — assets are pulled *into* a Buildmarkets account from the delivering firm.
+- **Full** — the whole account moves, and the account at the delivering firm is closed.
+
+<Note>
+  ACATS transfers are only supported on **self-directed** accounts. Initiating a transfer on a managed account returns `400 ACAT_NOT_ALLOWED_FOR_MANAGED`.
+</Note>
+
+## Endpoints
+
+| Method | Path | Description | Scope |
+| --- | --- | --- | --- |
+| `GET` | `/v1/acats/brokers` | List common delivering broker-dealers and their DTC numbers | `accounts:read` |
+| `POST` | `/v1/accounts/{accountId}/acats/incoming` | Initiate an incoming transfer | `accounts:write` |
+| `GET` | `/v1/accounts/{accountId}/acats` | List transfers for an account | `accounts:read` |
+| `GET` | `/v1/accounts/{accountId}/acats/{acatId}` | Get a single transfer | `accounts:read` |
+
+## Transfer lifecycle
+
+```text
+      POST .../acats/incoming
+               │
+        ┌──────▼──────┐
+        │   pending   │  ◄─── Submitted; awaiting the delivering firm
+        └──────┬──────┘
+               │
+        ┌──────▼──────┐
+        │  submitted  │  ◄─── Accepted by NSCC; in the delivering firm's queue
+        └──────┬──────┘
+               │
+          ┌────┴────┐
+          │         │
+    ┌─────▼───┐ ┌───▼──────┐
+    │ settled │ │ rejected │  ◄─── The transfer could not be completed
+    └─────────┘ └──────────┘
+```
+
+| Status | Meaning |
+| --- | --- |
+| `pending` | The transfer has been submitted and is awaiting acknowledgement from the delivering firm |
+| `submitted` | NSCC has accepted the request and it is in the delivering firm's queue |
+| `settled` | Assets have been re-registered to the Buildmarkets account |
+| `rejected` | The transfer did not complete |
+
+There are no webhook events for ACATS transfers. Poll `GET /v1/accounts/{accountId}/acats/{acatId}` to track progress.
+
+## 1. Choose the delivering firm
+
+The transfer needs the delivering firm's DTC/NSCC participant number. `GET /v1/acats/brokers` returns common firms so you can build a picker in your UI.
+
+```bash
+curl https://dev-tapp-api.tappengine.com/v1/acats/brokers \
+  -H "X-API-Key: YOUR_API_KEY" -H "X-API-Secret: YOUR_API_SECRET"
+```
+
+```json
+{
+  "brokers": [
+    {
+      "code": "schwab",
+      "name": "Charles Schwab",
+      "dtc_number": "0164",
+      "logo_url": null
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `code` | string | Stable identifier for the firm. Use this in UI logic rather than matching on `name` |
+| `name` | string | Display name |
+| `dtc_number` | string | DTC/NSCC participant number — pass this as `contra_broker_dealer_number` |
+| `logo_url` | string \| null | Logo for display, if available |
+
+<Tip>
+  This list is a convenience, not an allowlist. The initiate endpoint accepts any valid DTC number, so let customers enter one manually if their firm is not listed.
+</Tip>
+
+## 2. Initiate the transfer
+
+`POST /v1/accounts/{accountId}/acats/incoming`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `contra_broker_dealer_number` | string | ✅ | DTC/NSCC number of the delivering firm |
+| `contra_account_number` | string | ✅ | The customer's account number at the delivering firm |
+| `account_holder_name` | string |  | Registered account name at the delivering firm. Used by NSCC to match the account |
+| `tax_id` | string |  | SSN or EIN on the account at the delivering firm. Used by NSCC to match the account, and never returned in any response |
+
+```bash
+curl -X POST https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID/acats/incoming \
+  -H "X-API-Key: YOUR_API_KEY" -H "X-API-Secret: YOUR_API_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contra_broker_dealer_number": "0164",
+    "contra_account_number": "12345678",
+    "account_holder_name": "Jane Doe"
+  }'
+```
+
+<Tip>
+  Supplying `account_holder_name` and `tax_id` exactly as they appear at the delivering firm reduces the chance of a rejection for mismatched details.
+</Tip>
+
+**Response (`201 Created`):**
+
+```json
+{
+  "id": "7c1e9a42-3b5d-4f8e-a6c2-9d0b1e2f3a4c",
+  "account_id": "b3f2c9a1-7d4e-4f8a-9c1b-2e3d4f5a6b7c",
+  "direction": "incoming",
+  "transfer_type": "FUL",
+  "status": "pending",
+  "contra_broker_dealer_number": "0164",
+  "contra_account_number": "12345678",
+  "assets": [],
+  "created_at": "2026-09-15T14:32:00Z",
+  "updated_at": "2026-09-15T14:32:00Z"
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | string | Transfer identifier. Stable for the life of the transfer — pass it to `GET .../acats/{acatId}`. Treat it as an opaque string: its format is not guaranteed to be a UUID |
+| `account_id` | string (UUID) | The receiving Buildmarkets account |
+| `direction` | string | Always `incoming` |
+| `transfer_type` | string | Always `FUL` (full transfer) |
+| `status` | string | `pending`, `submitted`, `settled`, or `rejected` |
+| `contra_broker_dealer_number` | string | DTC/NSCC number of the delivering firm |
+| `contra_account_number` | string | The customer's account number at the delivering firm |
+| `assets` | array | Positions included in the transfer, each with `symbol`, `quantity`, and `asset_category` |
+| `created_at` | string (ISO 8601) | When the transfer was initiated |
+| `updated_at` | string (ISO 8601) | When the transfer was last updated |
+
+## 3. Track the transfer
+
+List every incoming transfer on an account:
+
+```bash
+curl https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID/acats \
+  -H "X-API-Key: YOUR_API_KEY" -H "X-API-Secret: YOUR_API_SECRET"
+```
+
+```json
+{
+  "transfers": [
+    {
+      "id": "7c1e9a42-3b5d-4f8e-a6c2-9d0b1e2f3a4c",
+      "account_id": "b3f2c9a1-7d4e-4f8a-9c1b-2e3d4f5a6b7c",
+      "direction": "incoming",
+      "transfer_type": "FUL",
+      "status": "submitted",
+      "contra_broker_dealer_number": "0164",
+      "contra_account_number": "12345678",
+      "assets": [],
+      "created_at": "2026-09-15T14:32:00Z",
+      "updated_at": "2026-09-15T14:33:10Z"
+    }
+  ]
+}
+```
+
+Or fetch one transfer by its `id`:
+
+```bash
+curl https://dev-tapp-api.tappengine.com/v1/accounts/ACCOUNT_ID/acats/7c1e9a42-3b5d-4f8e-a6c2-9d0b1e2f3a4c \
+  -H "X-API-Key: YOUR_API_KEY" -H "X-API-Secret: YOUR_API_SECRET"
+```
+
+The response has the same shape as the `201` response above.
+
+## Testing in sandbox
+
+In sandbox, a transfer's status advances automatically based on how long ago it was created, so you can build and test your polling loop without waiting on real settlement:
+
+| Time since creation | Status |
+| --- | --- |
+| 0–30 seconds | `pending` |
+| 30 seconds – 2 minutes | `submitted` |
+| After 2 minutes | `settled` |
+
+Sandbox transfers always settle. To test your handling of `rejected`, simulate that state in your own code.
+
+## Common errors
+
+| HTTP Status | Error | Cause |
+| --- | --- | --- |
+| `400` | `MISSING_FIELDS` | `contra_broker_dealer_number` or `contra_account_number` is missing |
+| `400` | `ACAT_NOT_ALLOWED_FOR_MANAGED` | The account is a managed account. ACATS transfers are only supported on self-directed accounts |
+| `403` | `FORBIDDEN` | The API key lacks the required scope |
+| `404` | `ACCOUNT_NOT_FOUND` | The `accountId` does not exist or is not accessible to your partner |
+| `404` | `ACAT_TRANSFER_NOT_FOUND` | No incoming transfer with that `acatId` exists on this account |
+
+## Next steps
+
+- [Deposits & Withdrawals →](/guides/self-directed/deposits-withdrawals) — Move cash in and out of the account
+- [Positions & Portfolio →](/guides/self-directed/positions-portfolio) — View the positions once a transfer settles
