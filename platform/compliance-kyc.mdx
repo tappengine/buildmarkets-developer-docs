@@ -78,9 +78,35 @@ Government ID image(s) used for identity verification, submitted alongside the a
 
 A `passport` requires one entry; `id_card` and `drivers_license` require two entries (one `front`, one `back`).
 
+### `joint_owner` object (joint accounts)
+
+Describes the second account holder. Required when `account_type` is `joint`, and ignored for every other account type.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `given_name` | string | ✅ | Legal first name, up to 50 characters |
+| `middle_name` | string |  | Middle name or initial, up to 50 characters |
+| `family_name` | string | ✅ | Legal last name, up to 50 characters |
+| `date_of_birth` | string | ✅ | Date of birth in `YYYY-MM-DD` format. The joint owner must be at least 18 years old |
+| `tax_id` | string | ✅ | SSN or EIN (must be 9 digits for US tax IDs, dashes optional). Foreign identification numbers (`FIN`) may be alphanumeric. |
+| `tax_id_type` | string |  | Defaults to `USA_SSN`. Other values: `USA_EIN`, `FIN` |
+| `relationship` | string | ✅ | Relationship to the primary account holder (e.g. `Spouse`), up to 50 characters |
+| `country_of_citizenship` | string |  | ISO country code. Defaults to `US` |
+| `street_address` | string\[\] |  | Street address lines, if different from the primary holder |
+| `city` | string |  | City, if different from the primary holder |
+| `state` | string |  | 2-letter state code, if different from the primary holder |
+| `postal_code` | string |  | ZIP code, if different from the primary holder |
+| `country` | string |  | ISO country code, if different from the primary holder |
+| `employer_name` | string |  | Joint owner's employer |
+| `employer_address` | string |  | Joint owner's employer address |
+
+```json
+"joint_owner": { "given_name": "Carlos", "family_name": "Martinez", "date_of_birth": "1990-03-14", "tax_id": "528-41-7830", "tax_id_type": "USA_SSN", "relationship": "Spouse" }
+```
+
 ### Other optional top-level fields
 
-`account_type` (`individual` default, `joint`, `ira_traditional`, `ira_roth`, or `custodial`), `trusted_contact`, `employment`, `mailing_address`, `joint_owner` (required when `account_type` is `joint`), `requested_option_level`, `dividend_reinvestment`, `discretionary_account`, `registered_rep_code`, `advisor_code`, `corr_metadata` (freeform, up to 255 chars).
+`account_type` (`individual` default, `joint`, `ira_traditional`, `ira_roth`, or `custodial`), `trusted_contact`, `employment`, `mailing_address`, `joint_owner` (required when `account_type` is `joint` — see the table above), `requested_option_level`, `dividend_reinvestment`, `discretionary_account`, `registered_rep_code`, `advisor_code`, `corr_metadata` (freeform, up to 255 chars).
 
 ## Identity Document Verification
 
@@ -142,6 +168,10 @@ Use Webhooks to receive real-time notifications when an account's `status` or `k
 | `VALIDATION_ERROR: identity.date_of_birth` | Date not in `YYYY-MM-DD` format |
 | `MISSING_REQUIRED_FIELD: agreements` | No agreements array provided |
 | `VALIDATION_ERROR: agreements[0].signed_at` | Timestamp not in ISO 8601 format |
+| `VALIDATION_ERROR: joint_owner` | `account_type` is `joint` but no `joint_owner` object was sent |
+| `VALIDATION_ERROR: joint_owner.relationship` | `relationship` omitted from `joint_owner` |
+| `VALIDATION_ERROR: joint_owner.tax_id` | Joint owner's `USA_SSN` or `USA_EIN` tax ID is not 9 digits |
+| `VALIDATION_ERROR: joint_owner.date_of_birth` | Joint owner is under 18, or date not in `YYYY-MM-DD` format |
 
 ## Next Steps
 

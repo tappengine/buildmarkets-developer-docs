@@ -27,7 +27,7 @@ Create an account using POST request to `/v1/accounts` with account type, contac
 
 Account response includes: `id`, `user_id`, `account_number`, `status`, `kyc_status`, `currency`, `created_at`, and `account_type`.
 
-A single user can hold multiple accounts. Keep the `user_id` from the response — once the user's KYC is approved, open additional accounts (e.g., an IRA alongside an individual account) via `POST /v1/users/{userId}/accounts` with just an `account_type`; document verification is skipped because the existing approval carries over.
+A single user can hold multiple accounts. Keep the `user_id` from the response — once the user's KYC is approved, open additional accounts (e.g., an IRA alongside an individual account) via `POST /v1/users/{userId}/accounts` with just an `account_type` (plus `joint_owner` for a joint account); document verification is skipped because the existing approval carries over.
 
 ## Step 3: Link a Bank Account
 
