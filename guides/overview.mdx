@@ -98,7 +98,6 @@ description: "Integration-pattern catalog covering common embedded investing use
 3. Power market data widgets — quotes, logos, news — `GET /v1/marketdata/real-time/{symbol}`, `GET /v1/marketdata/logos/{symbol}`, `GET /v1/marketdata/news/{symbol}`
 4. Let users place orders from within your banking UI — `POST /v1/accounts/{accountId}/orders`
 5. Sync order and funding status back to your core system — `POST /v1/webhooks`
-6. Retrieve execution reports for internal reconciliation — `GET /v1/accounts/{accountId}/orders/{orderId}/executions`
 
 **Key account field:**
 - `corr_metadata` — a freeform string (up to 255 chars) for storing your internal user or account ID alongside the Buildmarkets account. Makes cross-system lookups straightforward without a separate mapping table.
