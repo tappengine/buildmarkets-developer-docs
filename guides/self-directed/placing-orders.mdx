@@ -86,19 +86,6 @@ curl -X PATCH .../orders/ord-xyz789 -d '{ "limit_price": "370.00", "quantity": "
 
 Cancels an open order. The order must be in `new` or `partially_filled` status. Returns `204 No Content`. Cancellations are not guaranteed — if the order fills before the cancel reaches the market, you will receive an `INVALID_ORDER_STATE` error and the order will appear as `filled`.
 
-## Get execution reports (fills) — `GET /v1/accounts/{accountId}/orders/{orderId}/executions`
-
-Returns individual fill reports. Large orders may fill in multiple partial executions at different prices.
-
-```json
-[
-  { "execution_id": "exec-001", "order_id": "ord-xyz789", "symbol": "AAPL", "side": "buy", "quantity": "6", "price": "181.75", "executed_at": "2025-06-01T14:30:02Z" },
-  { "execution_id": "exec-002", "order_id": "ord-xyz789", "symbol": "AAPL", "side": "buy", "quantity": "4", "price": "181.80", "executed_at": "2025-06-01T14:30:02Z" }
-]
-```
-
-The VWAP fill price for the order is the volume-weighted average of all execution prices — reflected in `filled_avg_price` on the order object.
-
 ## Tracking orders and idempotency
 
 If your order request times out, do not blindly retry without first checking whether the order was created — query `GET /v1/accounts/{accountId}/orders` and search for your `client_order_id`. Subscribe to the `order.submitted`, `order.partially_filled`, `order.filled`, `order.cancelled`, and `order.rejected` webhook events rather than polling.

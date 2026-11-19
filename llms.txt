@@ -86,7 +86,6 @@ Supports equity and ETF orders. Options, fixed income, and crypto not supported 
 | GET | `/v1/accounts/{accountId}/orders/{orderId}` | Order details |
 | PATCH | `/v1/accounts/{accountId}/orders/{orderId}` | Modify open order |
 | DELETE | `/v1/accounts/{accountId}/orders/{orderId}` | Cancel open order |
-| GET | `/v1/accounts/{accountId}/orders/{orderId}/executions` | Execution reports |
 
 Order types: `market`, `limit` (requires `limit_price`).
 
